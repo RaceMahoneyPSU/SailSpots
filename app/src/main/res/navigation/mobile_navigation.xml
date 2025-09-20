@@ -22,4 +22,10 @@
         android:name="com.example.sailspots.ui.slideshow.SlideshowFragment"
         android:label="@string/menu_slideshow"
         tools:layout="@layout/fragment_slideshow" />
+
+    <fragment
+        android:id="@+id/mapsFragment"
+        android:name="com.example.sailspots.ui.maps.MapsFragment"
+        android:label="Map"
+        tools:layout="@layout/fragment_maps" />
 </navigation>
