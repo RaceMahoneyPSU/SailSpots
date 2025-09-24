@@ -5,6 +5,16 @@
       <config />
     </shared>
     <layouts>
+      <layout url="file://$PROJECT_DIR$/app/src/main/res/drawable/bg_login_gradient.xml">
+        <config>
+          <theme>@style/Theme.SailSpots</theme>
+        </config>
+      </layout>
+      <layout url="file://$PROJECT_DIR$/app/src/main/res/drawable/ic_sailboat.xml">
+        <config>
+          <theme>@style/Theme.SailSpots</theme>
+        </config>
+      </layout>
       <layout url="file://$PROJECT_DIR$/app/src/main/res/layout/activity_login.xml">
         <config>
           <theme>@style/Theme.SailSpots</theme>
@@ -16,7 +26,13 @@
     <option name="autoReloadType" value="NONE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="69f232a5-4f6e-4ccd-83c6-78d21432e8be" name="Changes" comment="" />
+    <list default="true" id="69f232a5-4f6e-4ccd-83c6-78d21432e8be" name="Changes" comment="">
+      <change afterPath="$PROJECT_DIR$/app/src/main/res/drawable/bg_login_gradient.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/res/layout/activity_login.xml" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/res/layout/activity_login.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/res/values/colors.xml" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/res/values/colors.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/app/src/main/res/values/strings.xml" beforeDir="false" afterPath="$PROJECT_DIR$/app/src/main/res/values/strings.xml" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -53,6 +69,7 @@
       <list>
         <option value="layoutResourceFile" />
         <option value="Class" />
+        <option value="resourceFile" />
       </list>
     </option>
   </component>
@@ -208,12 +225,12 @@
       <map>
         <entry key="com.example.sailspots">
           <value>
-            <CheckInfo lastCheckTimestamp="1758312745160" />
+            <CheckInfo lastCheckTimestamp="1758672933333" />
           </value>
         </entry>
         <entry key="com.example.sailspots.test">
           <value>
-            <CheckInfo lastCheckTimestamp="1758312745160" />
+            <CheckInfo lastCheckTimestamp="1758672933335" />
           </value>
         </entry>
       </map>
