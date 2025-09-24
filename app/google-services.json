@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "86253596328",
+    "project_id": "sailspots",
+    "storage_bucket": "sailspots.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:86253596328:android:7363565090dba6364d9c9d",
+        "android_client_info": {
+          "package_name": "com.example.sailspots"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "86253596328-9gplmjng1f5oondnkdkfuos52epm28en.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.sailspots",
+            "certificate_hash": "670fc40a7cc401ad918de6e2c0cdb32764701be7"
+          }
+        },
+        {
+          "client_id": "86253596328-ai02o5frf1i19am343b22gl5sa0cuvpg.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCEB4sK_5FZfPeeCHao5itEWxb6UTJYVaY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "86253596328-ai02o5frf1i19am343b22gl5sa0cuvpg.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
