@@ -1,12 +1,12 @@
 <component name="libraryTable">
   <library name="Gradle: androidx.transition:transition:1.5.0@aar" external-system-id="GRADLE">
     <ANNOTATIONS>
-      <root url="jar://$USER_HOME$/.gradle/caches/8.13/transforms/35f6703c3f74b8841a4ace587ec2bb51/transformed/transition-1.5.0/annotations.zip!/" />
+      <root url="jar://$USER_HOME$/.gradle/caches/8.13/transforms/8c5960dbad5448a3e75e81600efb3ed3/transformed/transition-1.5.0/annotations.zip!/" />
     </ANNOTATIONS>
     <CLASSES>
-      <root url="jar://$USER_HOME$/.gradle/caches/8.13/transforms/35f6703c3f74b8841a4ace587ec2bb51/transformed/transition-1.5.0/jars/classes.jar!/" />
-      <root url="file://$USER_HOME$/.gradle/caches/8.13/transforms/35f6703c3f74b8841a4ace587ec2bb51/transformed/transition-1.5.0/AndroidManifest.xml" />
-      <root url="file://$USER_HOME$/.gradle/caches/8.13/transforms/35f6703c3f74b8841a4ace587ec2bb51/transformed/transition-1.5.0/res" />
+      <root url="file://$USER_HOME$/.gradle/caches/8.13/transforms/8c5960dbad5448a3e75e81600efb3ed3/transformed/transition-1.5.0/res" />
+      <root url="file://$USER_HOME$/.gradle/caches/8.13/transforms/8c5960dbad5448a3e75e81600efb3ed3/transformed/transition-1.5.0/AndroidManifest.xml" />
+      <root url="jar://$USER_HOME$/.gradle/caches/8.13/transforms/8c5960dbad5448a3e75e81600efb3ed3/transformed/transition-1.5.0/jars/classes.jar!/" />
     </CLASSES>
     <JAVADOC />
     <SOURCES>
