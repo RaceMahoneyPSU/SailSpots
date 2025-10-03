@@ -39,28 +39,21 @@ android {
 dependencies {
     implementation(libs.appcompat)
     implementation(libs.material)
-    implementation(libs.constraintlayout) // You had 2.2.0 and 2.2.1, libs is 2.2.1
+    implementation(libs.constraintlayout)
     implementation(libs.lifecycle.livedata.ktx)
     implementation(libs.lifecycle.viewmodel.ktx)
     implementation(libs.navigation.fragment)
     implementation(libs.navigation.ui)
     implementation(libs.activity)
-
-    // --- Firebase and Google Auth Dependencies (Cleaned Up) ---
-
-    // 1. Import the Firebase Bill of Materials (BoM).
-    // This manages the versions for other Firebase libraries.
-    implementation(platform("com.google.firebase:firebase-bom:33.1.2")) // Use a specific, recent version
-
-    // 2. Add Firebase Authentication dependency WITHOUT specifying a version.
-    // The BoM will select the correct version for you.
+    // --- Firebase and Google Auth Dependencies ---
+    // Firebase Bill of Materials (BoM).
+    implementation(platform("com.google.firebase:firebase-bom:33.1.2"))
+    // Firebase Authentication
     implementation("com.google.firebase:firebase-auth")
-
-    // 3. Add the Credentials and Google ID libraries (only once).
+    // Credentials and Google ID libraries
     implementation(libs.credentials)
     implementation(libs.credentials.play.services.auth)
     implementation(libs.googleid)
-
     // --- Testing Dependencies ---
     testImplementation(libs.junit)
     androidTestImplementation(libs.ext.junit)
