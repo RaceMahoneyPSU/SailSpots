@@ -6,6 +6,7 @@
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
 
+    <uses-permission android:name="android.permission.INTERNET"></uses-permission>
     <application
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
@@ -19,15 +20,24 @@
             android:name="com.google.android.geo.API_KEY"
             android:value="@string/google_maps_key"/>
         <activity
-            android:name=".MainActivity"
+            android:name=".auth.RegisterActivity"
+            android:exported="false"
+            android:label="@string/title_register"
+            android:theme="@style/Theme.SailSpots.NoActionBar" />
+        <activity
+            android:name=".auth.LoginActivity"
             android:exported="true"
-            android:label="@string/app_name"
+            android:label="@string/login_title"
             android:theme="@style/Theme.SailSpots.NoActionBar">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <activity
+            android:name=".MainActivity"
+            android:exported="false"
+            android:label="@string/app_name"
+            android:theme="@style/Theme.SailSpots.NoActionBar" />
     </application>
 </manifest>

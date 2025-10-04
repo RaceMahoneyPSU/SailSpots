@@ -1,5 +1,7 @@
 plugins {
     alias(libs.plugins.android.application)
+    // Add the Google services Gradle plugin
+    id("com.google.gms.google-services")
 }
 
 android {
@@ -26,8 +28,8 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
     buildFeatures {
         viewBinding = true
@@ -45,6 +47,17 @@ dependencies {
     implementation(libs.lifecycle.viewmodel.ktx)
     implementation(libs.navigation.fragment)
     implementation(libs.navigation.ui)
+    implementation(libs.activity)
+    // --- Firebase and Google Auth Dependencies ---
+    // Firebase Bill of Materials (BoM).
+    implementation(platform("com.google.firebase:firebase-bom:33.1.2"))
+    // Firebase Authentication
+    implementation("com.google.firebase:firebase-auth")
+    // Credentials and Google ID libraries
+    implementation(libs.credentials)
+    implementation(libs.credentials.play.services.auth)
+    implementation(libs.googleid)
+    // --- Testing Dependencies ---
     testImplementation(libs.junit)
     androidTestImplementation(libs.ext.junit)
     androidTestImplementation(libs.espresso.core)
