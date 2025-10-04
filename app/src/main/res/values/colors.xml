@@ -7,4 +7,11 @@
     <color name="teal_700">#FF018786</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+    <color name="blue_primary">#3A7BD5</color>
+    <color name="blue_primary_dark">#1F3A6D</color>
+    <color name="blue_accent">#5FA8F5</color>
+    <color name="blue_on_primary">#FFFFFFFF</color>
+    <color name="login_field_hint">#99505050</color>
+    <color name="login_secondary_text">#FF6B6B6B</color>
+    <color name="login_link">#FF1E88E5</color>
 </resources>
