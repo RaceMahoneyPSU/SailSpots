@@ -7,7 +7,7 @@ import java.util.Locale;
  * A data model class representing a single boating spot.
  * Implements Serializable to allow instances to be passed between activities via Intents.
  */
-public class SpotsItem implements Serializable {
+public class   SpotsItem implements Serializable {
 
     /**
      * Defines the type of the boating spot.
