@@ -4,8 +4,6 @@ plugins {
     id("com.google.gms.google-services")
 }
 
-
-
 android {
     namespace = "com.example.sailspots"
     compileSdk = 36
