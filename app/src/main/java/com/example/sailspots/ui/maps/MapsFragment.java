@@ -7,6 +7,7 @@ import android.location.Address;
 import android.location.Geocoder;
 import android.os.Bundle;
 import android.os.Looper;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -22,6 +23,7 @@ import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 
 import com.example.sailspots.R;
+import com.example.sailspots.models.SpotsItem; // <-- your existing model
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
@@ -47,7 +49,8 @@ import java.util.concurrent.Executors;
 public class MapsFragment extends Fragment implements OnMapReadyCallback {
 
     private static final String TAG_MAP = "mapFrag";
-    private static final int RADIUS_METERS_50_MILES = 80467; // ~50 miles
+    private static final String TAG_FAV = "SpotsItem";
+    private static final double MAX_MILES = 50.0;
 
     private GoogleMap mMap;
     private SearchView searchView;
@@ -64,7 +67,7 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
                 else Toast.makeText(requireContext(), "Location permission denied", Toast.LENGTH_SHORT).show();
             });
 
-    public MapsFragment() { /* Required empty public constructor */ }
+    public MapsFragment() { }
 
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container,
@@ -82,6 +85,7 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
         marinaAdapter = new MarinaAdapter(requireContext(), marinaData);
         listView.setAdapter(marinaAdapter);
 
+        // Open details on row tap (explicit intent)
         listView.setOnItemClickListener((parent, view, position, id) -> {
             MarinaItem item = marinaData.get(position);
             Intent intent = new Intent(requireContext(), SpotDetailActivity.class);
@@ -93,8 +97,22 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
             startActivity(intent);
         });
 
-        createSearchViewListener();
+        // ♥ Favorite click -> convert to SpotsItem (your model) and log it
+        marinaAdapter.setOnFavoriteClickListener(item -> {
+            SpotsItem spot = new SpotsItem(
+                    item.name,                   // name
+                    item.address,                // address
+                    "",                          // imageUrl (none for now)
+                    SpotsItem.Type.MARINA,       // type
+                    item.latLng.latitude,        // latitude
+                    item.latLng.longitude,       // longitude
+                    true                         // favorite
+            );
+            Log.d(TAG_FAV, spot.toString());
+            Toast.makeText(requireContext(), "Favorited (logged)", Toast.LENGTH_SHORT).show();
+        });
 
+        // Add & attach the map
         if (savedInstanceState == null) {
             SupportMapFragment mapFragment = new SupportMapFragment();
             getChildFragmentManager().beginTransaction()
@@ -108,11 +126,12 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
         if (mapFrag != null) {
             mapFrag.getMapAsync(this);
         }
+
+        createSearchViewListener();
     }
 
     private void createSearchViewListener() {
         if (searchView == null) return;
-
         searchView.setIconifiedByDefault(false);
         searchView.setQueryHint("Search for a location…");
 
@@ -150,10 +169,8 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
                                         "Geocoder error. Check network/GMS.", Toast.LENGTH_SHORT).show());
                     }
                 });
-
                 return true;
             }
-
             @Override public boolean onQueryTextChange(String newText) { return false; }
         });
     }
@@ -169,8 +186,10 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
 
         enableMyLocation();
 
+        // Initial load
         fetchMarinasNear(nyc);
 
+        // Refresh when camera stops moving
         mMap.setOnCameraIdleListener(() -> {
             LatLng center = mMap.getCameraPosition().target;
             fetchMarinasNear(center);
@@ -181,9 +200,8 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
         if (mMap == null) return;
         if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_FINE_LOCATION)
                 == PackageManager.PERMISSION_GRANTED) {
-            try {
-                mMap.setMyLocationEnabled(true);
-            } catch (SecurityException ignored) { }
+            try { mMap.setMyLocationEnabled(true); }
+            catch (SecurityException ignored) { }
         } else {
             requestFineLocation.launch(Manifest.permission.ACCESS_FINE_LOCATION);
         }
@@ -196,7 +214,7 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
         mMap.animateCamera(CameraUpdateFactory.newCameraPosition(pos));
     }
 
-    // --- Marina fetching & UI update ---
+    // ----------------- Marina Fetch with strict + fallback -----------------
 
     private void fetchMarinasNear(@NonNull LatLng center) {
         final String apiKey = getMapsKeyFromManifest();
@@ -205,65 +223,105 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
             return;
         }
 
-        // NOTE: This calls the Places Nearby Search **Web Service** (HTTP).
-        // For production, prefer calling this from your backend with a server-restricted key.
-        String urlStr = String.format(
+        // STRICT Nearby Search (type=marina, rankby=distance)
+        final String nearbyUrl = String.format(
                 Locale.US,
-                "https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=%f,%f&radius=%d&type=marina&key=%s",
-                center.latitude, center.longitude, RADIUS_METERS_50_MILES, apiKey
+                "https://maps.googleapis.com/maps/api/place/nearbysearch/json" +
+                        "?location=%f,%f&rankby=distance&type=marina&key=%s",
+                center.latitude, center.longitude, apiKey
         );
 
         executor.execute(() -> {
-            HttpURLConnection conn = null;
-            try {
-                URL url = new URL(urlStr);
-                conn = (HttpURLConnection) url.openConnection();
-                conn.setRequestMethod("GET");
-                conn.setConnectTimeout(10000);
-                conn.setReadTimeout(10000);
-
-                int code = conn.getResponseCode();
-                if (code != 200) {
-                    runOnUiThreadSafe(() -> Toast.makeText(requireContext(),
-                            "Places error " + code, Toast.LENGTH_SHORT).show());
-                    return;
-                }
-
-                BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream()));
-                StringBuilder sb = new StringBuilder();
-                String line;
-                while ((line = br.readLine()) != null) sb.append(line);
-                br.close();
-
-                JSONObject root = new JSONObject(sb.toString());
-                JSONArray results = root.optJSONArray("results");
-
-                ArrayList<MarinaItem> items = new ArrayList<>();
-                if (results != null) {
-                    for (int i = 0; i < results.length(); i++) {
-                        JSONObject r = results.getJSONObject(i);
-                        String name = r.optString("name", "Marina");
-                        String vicinity = r.optString("vicinity", "");
-                        String placeId = r.optString("place_id", "");
-                        JSONObject geom = r.optJSONObject("geometry");
-                        JSONObject loc = geom != null ? geom.optJSONObject("location") : null;
-                        if (loc == null) continue;
-                        double lat = loc.optDouble("lat");
-                        double lng = loc.optDouble("lng");
-                        LatLng ll = new LatLng(lat, lng);
-                        double miles = distanceMiles(center.latitude, center.longitude, lat, lng);
-                        items.add(new MarinaItem(name, vicinity, placeId, ll, miles));
-                    }
-                }
-
-                runOnUiThreadSafe(() -> updateMarinaListAndMarkers(items));
-            } catch (Exception e) {
-                runOnUiThreadSafe(() ->
-                        Toast.makeText(requireContext(), "Failed to load marinas", Toast.LENGTH_SHORT).show());
-            } finally {
-                if (conn != null) conn.disconnect();
+            List<MarinaItem> strict = callPlacesAndParse(nearbyUrl, center, true);
+            if (strict != null && !strict.isEmpty()) {
+                runOnUiThreadSafe(() -> updateMarinaListAndMarkers(strict));
+                return;
             }
+
+            // Fallback Text Search if Nearby returns none
+            final String textUrl = String.format(
+                    Locale.US,
+                    "https://maps.googleapis.com/maps/api/place/textsearch/json" +
+                            "?query=%s&location=%f,%f&radius=%d&key=%s",
+                    "boat+marina+yacht+club+harbor", center.latitude, center.longitude,
+                    50000, apiKey // 50km (~31mi) max for Text Search
+            );
+
+            List<MarinaItem> fallback = callPlacesAndParse(textUrl, center, false);
+            runOnUiThreadSafe(() -> {
+                if (fallback != null && !fallback.isEmpty()) {
+                    updateMarinaListAndMarkers(fallback);
+                } else {
+                    Toast.makeText(requireContext(), "No marinas found nearby.", Toast.LENGTH_SHORT).show();
+                    updateMarinaListAndMarkers(new ArrayList<>());
+                }
+            });
         });
+    }
+
+    @Nullable
+    private List<MarinaItem> callPlacesAndParse(String urlStr, LatLng center, boolean strictType) {
+        HttpURLConnection conn = null;
+        try {
+            URL url = new URL(urlStr);
+            conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("GET");
+            conn.setConnectTimeout(10000);
+            conn.setReadTimeout(10000);
+
+            int code = conn.getResponseCode();
+            if (code != 200) return null;
+
+            BufferedReader br = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+            StringBuilder sb = new StringBuilder();
+            String line; while ((line = br.readLine()) != null) sb.append(line);
+            br.close();
+
+            JSONObject root = new JSONObject(sb.toString());
+            JSONArray results = root.optJSONArray("results");
+            ArrayList<MarinaItem> items = new ArrayList<>();
+            if (results != null) {
+                for (int i = 0; i < results.length(); i++) {
+                    JSONObject r = results.getJSONObject(i);
+
+                    // Filter to marinas
+                    boolean isMarina = false;
+                    JSONArray types = r.optJSONArray("types");
+                    if (types != null) {
+                        for (int t = 0; t < types.length(); t++) {
+                            if ("marina".equals(types.optString(t))) { isMarina = true; break; }
+                        }
+                    }
+                    if (!isMarina && !strictType) {
+                        String nm = r.optString("name", "").toLowerCase(Locale.US);
+                        if (nm.contains("marina") || nm.contains("yacht") ||
+                                nm.contains("harbor") || nm.contains("harbour") ||
+                                nm.contains("boat club") || nm.contains("yacht club")) {
+                            isMarina = true;
+                        }
+                    }
+                    if (!isMarina) continue;
+
+                    JSONObject loc = r.optJSONObject("geometry").optJSONObject("location");
+                    if (loc == null) continue;
+                    double lat = loc.optDouble("lat");
+                    double lng = loc.optDouble("lng");
+                    double miles = distanceMiles(center.latitude, center.longitude, lat, lng);
+                    if (miles > MAX_MILES) continue; // keep within 50 miles
+
+                    String name = r.optString("name", "Marina");
+                    String vicinity = r.optString("vicinity", r.optString("formatted_address", ""));
+                    String placeId = r.optString("place_id", "");
+
+                    items.add(new MarinaItem(name, vicinity, placeId, new LatLng(lat, lng), miles));
+                }
+            }
+            return items;
+        } catch (Exception e) {
+            return null;
+        } finally {
+            if (conn != null) conn.disconnect();
+        }
     }
 
     private void updateMarinaListAndMarkers(@NonNull List<MarinaItem> items) {
@@ -282,7 +340,7 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
     }
 
     private static double distanceMiles(double lat1, double lon1, double lat2, double lon2) {
-        double R = 3958.7613; // Earth radius in miles
+        double R = 3958.7613;
         double dLat = Math.toRadians(lat2 - lat1);
         double dLon = Math.toRadians(lon2 - lon1);
         double a = Math.sin(dLat/2) * Math.sin(dLat/2) +
@@ -307,11 +365,5 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
         if (!isAdded() || getActivity() == null) return;
         if (Looper.myLooper() == Looper.getMainLooper()) r.run();
         else requireActivity().runOnUiThread(r);
-    }
-
-    @Override
-    public void onDestroyView() {
-        super.onDestroyView();
-        // executor.shutdownNow(); // uncomment if you create/destroy this fragment frequently
     }
 }

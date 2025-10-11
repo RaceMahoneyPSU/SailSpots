@@ -7,22 +7,42 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content">
 
-    <com.google.android.material.textview.MaterialTextView
-        android:id="@+id/tvTitle"
-        android:textStyle="bold"
-        android:textSize="16sp"
-        android:maxLines="1"
-        android:ellipsize="end"
-        android:textColor="?attr/colorOnSurface"
+    <!-- Top row: Title + Favorite -->
+    <LinearLayout
+        android:orientation="horizontal"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"/>
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical">
 
+        <com.google.android.material.textview.MaterialTextView
+            android:id="@+id/tvTitle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:textStyle="bold"
+            android:textSize="16sp"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:textColor="?attr/colorOnSurface" />
+
+        <ImageButton
+            android:id="@+id/btnFavorite"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/mark_favorite"
+            android:padding="6dp"
+            android:src="@drawable/ic_favorite_border_24"
+            app:tint="?attr/colorPrimary" />
+    </LinearLayout>
+
+    <!-- Subtitle (address + distance) -->
     <com.google.android.material.textview.MaterialTextView
         android:id="@+id/tvSubtitle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
         android:textSize="14sp"
         android:maxLines="1"
         android:ellipsize="end"
-        android:textColor="?attr/colorOnSurface"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"/>
+        android:textColor="?attr/colorOnSurface" />
 </LinearLayout>
