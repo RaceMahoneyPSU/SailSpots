@@ -31,15 +31,20 @@ public class SpotsDao {
      * @param item The SpotsItem to insert or update.
      * @return The row ID of the new or updated record.
      */
-    public long upsert(SpotsItem item) {
+    public void upsert(SpotsItem item) {
+        long id = insert(item);
+        if (id == -1) {
+            updateByPlaceId(item);
+        }
+    }
+
+    public long insert(SpotsItem item) {
         SQLiteDatabase db = helper.getWritableDatabase();
-        ContentValues cv = toValues(item);
-        // CONFLICT_REPLACE will delete the old row and insert the new one.
         return db.insertWithOnConflict(
                 SpotsContract.Spots.TABLE,
                 null,
-                cv,
-                SQLiteDatabase.CONFLICT_REPLACE
+                toValues(item),
+                SQLiteDatabase.CONFLICT_IGNORE
         );
     }
 
@@ -139,18 +144,16 @@ public class SpotsDao {
 
     /**
      * Updates an existing SpotsItem in the database.
-     * @param id The ID of the item to update.
      * @param item The SpotsItem object containing the new data.
      * @return The number of rows affected.
      */
-    public int update(long id, SpotsItem item) {
+    public int updateByPlaceId(SpotsItem item) {
         SQLiteDatabase db = helper.getWritableDatabase();
-        ContentValues cv = toValues(item);
         return db.update(
                 SpotsContract.Spots.TABLE,
-                cv,
-                SpotsContract.Spots._ID + "=?",
-                new String[]{String.valueOf(id)}
+                toValues(item),
+                SpotsContract.Spots.COL_PLACE_ID + "=?",
+                new String[]{ item.getPlaceId() }
         );
     }
 
@@ -185,6 +188,15 @@ public class SpotsDao {
                 SpotsContract.Spots.TABLE,
                 SpotsContract.Spots._ID + "=?",
                 new String[]{String.valueOf(id)}
+        );
+    }
+
+    public int deleteByPlaceId(String placeId) {
+        SQLiteDatabase db = helper.getWritableDatabase();
+        return db.delete(
+                SpotsContract.Spots.TABLE,
+                SpotsContract.Spots.COL_PLACE_ID + "=?",
+                new String[]{ placeId }
         );
     }
 
@@ -225,12 +237,12 @@ public class SpotsDao {
     private static ContentValues toValues(SpotsItem s) {
         ContentValues cv = new ContentValues();
         // The SpotsItem ID is not put here as it's handled by the primary key column.
+        cv.put(SpotsContract.Spots.COL_PLACE_ID, s.getPlaceId());
         cv.put(SpotsContract.Spots.COL_NAME, s.getName());
-        cv.put(SpotsContract.Spots.COL_TYPE, s.getType().name());
+        cv.put(SpotsContract.Spots.COL_ADDRESS, s.getAddress());
         cv.put(SpotsContract.Spots.COL_TYPE, s.getType().toString());
         cv.put(SpotsContract.Spots.COL_LAT, s.getLatitude());
         cv.put(SpotsContract.Spots.COL_LNG, s.getLongitude());
-        cv.put(SpotsContract.Spots.COL_IMAGE_URL, s.getImageUrl());
         cv.put(SpotsContract.Spots.COL_FAVORITE, s.isFavorite() ? 1 : 0); // Store boolean as 1 or 0
         return cv;
     }
@@ -243,14 +255,13 @@ public class SpotsDao {
     private static SpotsItem fromCursor(Cursor c) {
         SpotsItem item = new SpotsItem();
         // Read data from the cursor by column name and set it on the SpotsItem object.
+        item.setPlaceId(c.getString(c.getColumnIndexOrThrow(SpotsContract.Spots.COL_PLACE_ID)));
         item.setName(c.getString(c.getColumnIndexOrThrow(SpotsContract.Spots.COL_NAME)));
-
+        item.setAddress(c.getString(c.getColumnIndexOrThrow(SpotsContract.Spots.COL_ADDRESS)));
         String typeStr = c.getString(c.getColumnIndexOrThrow(SpotsContract.Spots.COL_TYPE));
         item.setType(SpotsItem.Type.fromString(typeStr));
-
         item.setLatitude(c.getDouble(c.getColumnIndexOrThrow(SpotsContract.Spots.COL_LAT)));
         item.setLongitude(c.getDouble(c.getColumnIndexOrThrow(SpotsContract.Spots.COL_LNG)));
-        item.setImageUrl(c.getString(c.getColumnIndexOrThrow(SpotsContract.Spots.COL_IMAGE_URL)));
         item.setFavorite(c.getInt(c.getColumnIndexOrThrow(SpotsContract.Spots.COL_FAVORITE)) == 1); // Convert 1 or 0 back to boolean
         return item;
     }

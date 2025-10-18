@@ -1,4 +1,4 @@
-package com.example.sailspots.ui.maps;
+package com.example.sailspots.data;
 
 import android.os.Bundle;
 import android.widget.TextView;

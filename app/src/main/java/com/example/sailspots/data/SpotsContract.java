@@ -13,7 +13,7 @@ public final class SpotsContract {
 
     // Database name and version constants.
     public static final String DB_NAME = "sailspots.db";
-    public static final int DB_VERSION = 1;
+    public static final int DB_VERSION = 2;
 
     /**
      * Defines the contents of the 'spots' table.
@@ -22,24 +22,28 @@ public final class SpotsContract {
     public static final class Spots implements BaseColumns {
         // Table name
         public static final String TABLE = "spots";
+        public static final String _ID = "_id";
 
         // Column names
+        public static final String COL_PLACE_ID   = "place_id";
         public static final String COL_NAME       = "name";
+        public static final String COL_ADDRESS    = "address";
         public static final String COL_TYPE       = "type";       // TEXT: RAMP | MARINA | BEACH
         public static final String COL_LAT        = "latitude";   // REAL
         public static final String COL_LNG        = "longitude";  // REAL
-        public static final String COL_IMAGE_URL  = "image_url";  // TEXT (nullable)
+
         public static final String COL_FAVORITE   = "favorite";   // INTEGER (0 for false, 1 for true)
 
         // SQL statement to create the 'spots' table.
         public static final String SQL_CREATE =
                 "CREATE TABLE " + TABLE + " (" +
                         _ID + " INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                        COL_PLACE_ID + " TEXT, " +
                         COL_NAME + " TEXT NOT NULL, " +
+                        COL_ADDRESS + " TEXT NOT NULL, " +
                         COL_TYPE + " TEXT NOT NULL, " +
                         COL_LAT + " REAL NOT NULL, " +
                         COL_LNG + " REAL NOT NULL, " +
-                        COL_IMAGE_URL + " TEXT, " +
                         COL_FAVORITE + " INTEGER NOT NULL DEFAULT 0, " +
                         // Defines a unique constraint to prevent duplicate entries.
                         "UNIQUE(" + COL_NAME + ", " + COL_LAT + ", " + COL_LNG + ") ON CONFLICT REPLACE" +
