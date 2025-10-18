@@ -133,7 +133,7 @@ public class RegisterActivity extends AppCompatActivity {
      * Clears the activity stack to provide a clean user experience.
      */
     private void navigateToMainActivity() {
-        Intent intent = new Intent(RegisterActivity.this, MainActivity.class);
+        Intent intent = new Intent(RegisterActivity.this, LoginActivity.class);
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
         startActivity(intent);
         finish();
