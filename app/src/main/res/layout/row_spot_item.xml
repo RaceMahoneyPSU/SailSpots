@@ -25,7 +25,6 @@
             android:layout_height="44dp"
             android:scaleType="centerCrop"
             android:contentDescription="@string/spot_image"
-            android:shapeAppearance="@style/ShapeAppearance.SmallComponent"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent"
             app:layout_constraintBottom_toBottomOf="parent" />

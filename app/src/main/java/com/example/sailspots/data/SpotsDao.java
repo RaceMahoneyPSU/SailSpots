@@ -201,6 +201,20 @@ public class SpotsDao {
         );
     }
 
+    /**
+     * Delete by name and address
+     */
+    public int deleteByNameAndLatLng(String name, double lat, double lng) {
+        SQLiteDatabase db = helper.getWritableDatabase();
+        return db.delete(
+                SpotsContract.Spots.TABLE,
+                SpotsContract.Spots.COL_NAME + "=? AND " +
+                        SpotsContract.Spots.COL_LAT + "=? AND " +
+                        SpotsContract.Spots.COL_LNG + "=?",
+                new String[]{name, String.valueOf(lat), String.valueOf(lng)}
+        );
+    }
+
     // --- Mapper Functions ---
 
     /**

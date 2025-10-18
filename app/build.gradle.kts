@@ -1,3 +1,6 @@
+// app/build.gradle.kts
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     // Add the Google services Gradle plugin
@@ -14,8 +17,15 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
-
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+        // --- Load MAPS_API_KEY from local.properties and set Manifest placeholder ---
+        val props = Properties().apply {
+            val f = rootProject.file("local.properties")
+            if (f.exists()) f.inputStream().use { load(it) }
+        }
+        val mapsKey = props.getProperty("MAPS_API_KEY") ?: ""
+        manifestPlaceholders["MAPS_API_KEY"] = mapsKey
     }
 
     buildTypes {
@@ -49,11 +59,8 @@ dependencies {
     implementation(libs.navigation.ui)
     implementation(libs.activity)
     // --- Firebase and Google Auth Dependencies ---
-    // Firebase Bill of Materials (BoM).
     implementation(platform("com.google.firebase:firebase-bom:33.1.2"))
-    // Firebase Authentication
     implementation("com.google.firebase:firebase-auth")
-    // Credentials and Google ID libraries
     implementation(libs.credentials)
     implementation(libs.credentials.play.services.auth)
     implementation(libs.googleid)
