@@ -4,10 +4,9 @@ import java.io.Serializable;
 import java.util.Locale;
 
 /**
- * A data model class representing a single boating spot.
- * Implements Serializable to allow instances to be passed between activities via Intents.
+ * A data model class representing a single boating spot for database storage. * Implements Serializable to allow instances to be passed between activities via Intents.
  */
-public class   SpotsItem implements Serializable {
+public class SpotsItem implements Serializable {
 
     /**
      * Defines the type of the boating spot.
@@ -40,9 +39,10 @@ public class   SpotsItem implements Serializable {
     }
 
     // --- Member Variables ---
+    private long id;           // The unique database ID (primary key).
+    private String placeId;    // The Google Places API ID for unique identification.
     private String name;
     private String address;
-    private String imageUrl;   // URL for a remote image.
     private Type type;         // The type of spot (RAMP, MARINA, or BEACH).
     private double latitude;   // GPS coordinate.
     private double longitude;  // GPS coordinate.
@@ -51,16 +51,18 @@ public class   SpotsItem implements Serializable {
     /**
      * Full constructor to create a new SpotsItem.
      */
-    public SpotsItem(String name,
+    public SpotsItem(long id,
+                     String placeId,
+                     String name,
                      String address,
-                     String imageUrl,
                      Type type,
                      double latitude,
                      double longitude,
                      boolean favorite) {
+        this.id = id;
+        this.placeId = placeId;
         this.name = name;
         this.address = address;
-        this.imageUrl = imageUrl;
         this.type = (type == null ? Type.RAMP : type); // Ensure type is never null.
         this.latitude = latitude;
         this.longitude = longitude;
@@ -68,27 +70,29 @@ public class   SpotsItem implements Serializable {
     }
 
     /**
-     * No-argument constructor required for some serialization frameworks like Firebase.
+     * No-argument constructor required for some serialization frameworks and database mapping.
      */
     public SpotsItem() {}
 
     // --- Getters ---
+    public long getId()           { return id; }
+    public String getPlaceId()    { return placeId; }
     public String getName()       { return name; }
     public String getAddress()    { return address; }
-    public String getImageUrl()   { return imageUrl; }
     public Type getType()         { return type; }
     public double getLatitude()   { return latitude; }
     public double getLongitude()  { return longitude; }
     public boolean isFavorite()   { return favorite; }
 
     // --- Setters ---
-    public void setName(String name)               { this.name = name; }
-    public void setAddress(String address)         { this.address = address; }
-    public void setImageUrl(String imageUrl)       { this.imageUrl = imageUrl; }
-    public void setType(Type type)                 { this.type = (type == null ? Type.RAMP : type); }
-    public void setLatitude(double latitude)       { this.latitude = latitude; }
-    public void setLongitude(double longitude)     { this.longitude = longitude; }
-    public void setFavorite(boolean favorite)      { this.favorite = favorite; }
+    public void setId(long id)                    { this.id = id; }
+    public void setPlaceId(String placeId)        { this.placeId = placeId; }
+    public void setName(String name)              { this.name = name; }
+    public void setAddress(String address)        { this.address = address; }
+    public void setType(Type type)                { this.type = (type == null ? Type.RAMP : type); }
+    public void setLatitude(double latitude)      { this.latitude = latitude; }
+    public void setLongitude(double longitude)    { this.longitude = longitude; }
+    public void setFavorite(boolean favorite)     { this.favorite = favorite; }
 
     /**
      * Convenience method to flip the favorite status.
