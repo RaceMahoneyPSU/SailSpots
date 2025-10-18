@@ -228,6 +228,7 @@ public class LoginActivity extends AppCompatActivity {
         // These flags clear the task stack and create a new one for MainActivity.
         // This is standard practice for a post-login navigation flow.
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        intent.putExtra("NAVIGATE_TO_MAPS", true);
         startActivity(intent);
         finish(); // Finish LoginActivity so it's removed from memory.
     }
