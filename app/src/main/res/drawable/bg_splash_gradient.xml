@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+
+    <!-- Smooth vertical gradient (top → bottom) -->
+    <gradient
+        android:type="linear"
+        android:angle="270"
+        android:startColor="@color/blue_accent"
+    android:centerColor="@color/blue_primary"
+    android:endColor="@color/blue_primary_dark"
+    android:centerY="0.4"
+    android:gradientRadius="250" />
+
+</shape>
