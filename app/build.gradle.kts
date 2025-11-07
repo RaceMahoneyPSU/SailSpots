@@ -60,7 +60,7 @@ dependencies {
     implementation(libs.activity)
 
     // --- Firebase and Google Auth Dependencies ---
-    implementation(platform("com.google.firebase:firebase-bom:33.5.2"))
+    implementation(platform("com.google.firebase:firebase-bom:34.5.0"))
     implementation("com.google.firebase:firebase-auth")
     implementation ("com.google.firebase:firebase-firestore")
 

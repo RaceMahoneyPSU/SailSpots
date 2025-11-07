@@ -18,6 +18,9 @@
     <style name="Theme.SailSpots.Splash" parent="Theme.SplashScreen">
         <item name="android:windowBackground">@drawable/bg_splash_gradient</item>
         <item name="postSplashScreenTheme">@style/Theme.SailSpots</item>
+        <item name="windowNoTitle">true</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowActionBar">false</item>
     </style>
 
     <style name="Theme.SailSpots.NoActionBar" parent="Theme.SailSpots">
