@@ -1,5 +1,7 @@
 package com.example.sailspots.models;
 
+import com.google.firebase.firestore.DocumentId;
+
 import java.io.Serializable;
 import java.util.Locale;
 
@@ -39,7 +41,8 @@ public class SpotsItem implements Serializable {
     }
 
     // --- Member Variables ---
-    private long id;           // The unique database ID (primary key).
+    @DocumentId
+    private String id;           // The unique database ID (primary key).
     private String placeId;    // The Google Places API ID for unique identification.
     private String name;
     private String address;
@@ -51,7 +54,7 @@ public class SpotsItem implements Serializable {
     /**
      * Full constructor to create a new SpotsItem.
      */
-    public SpotsItem(long id,
+    public SpotsItem(String id,
                      String placeId,
                      String name,
                      String address,
@@ -70,12 +73,12 @@ public class SpotsItem implements Serializable {
     }
 
     /**
-     * No-argument constructor required for some serialization frameworks and database mapping.
+     * No-argument constructor required for Firestore.
      */
     public SpotsItem() {}
 
     // --- Getters ---
-    public long getId()           { return id; }
+    public String getId()           { return id; }
     public String getPlaceId()    { return placeId; }
     public String getName()       { return name; }
     public String getAddress()    { return address; }
@@ -85,7 +88,7 @@ public class SpotsItem implements Serializable {
     public boolean isFavorite()   { return favorite; }
 
     // --- Setters ---
-    public void setId(long id)                    { this.id = id; }
+    public void setId(String id)                    { this.id = id; }
     public void setPlaceId(String placeId)        { this.placeId = placeId; }
     public void setName(String name)              { this.name = name; }
     public void setAddress(String address)        { this.address = address; }

@@ -6,6 +6,7 @@ import android.provider.BaseColumns;
  * Defines the database schema constants, such as table and column names.
  * This class acts as a contract for the database structure, ensuring consistency.
  */
+@Deprecated
 public final class SpotsContract {
 
     // Private constructor to prevent instantiation of the contract class.

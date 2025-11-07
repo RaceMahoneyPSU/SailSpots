@@ -23,6 +23,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.example.sailspots.R;
 import com.example.sailspots.data.MarinaAdapter;
 import com.example.sailspots.data.SpotsDao;
+import com.example.sailspots.data.SpotsRepository;
 import com.example.sailspots.models.MarinaItem;
 import com.example.sailspots.models.SpotsItem;
 import com.google.android.gms.maps.CameraUpdateFactory;
@@ -32,6 +33,7 @@ import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.CameraPosition;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.MarkerOptions;
+import com.google.firebase.firestore.ListenerRegistration;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -54,7 +56,11 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
     private SearchView searchView;
     private RecyclerView recyclerMarinas;
     private List<MarinaItem> allMarinas = new ArrayList<>();
-    private SpotsDao spotsDao;
+
+    private SpotsRepository spotsRepo;
+    private ListenerRegistration favReg;
+    private Set<String> favoriteIdsLive = new HashSet<>();
+
     private MarinaAdapter marinaAdapter;
 
     /**
@@ -94,7 +100,7 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
 
         // --- View and DAO Initialization ---
         searchView = root.findViewById(R.id.idSearchView);
-        spotsDao = new SpotsDao(requireContext());
+        spotsRepo = new SpotsRepository();
         recyclerMarinas = root.findViewById(R.id.recyclerMarinas);
         recyclerMarinas.setLayoutManager(new LinearLayoutManager(requireContext()));
         recyclerMarinas.setHasFixedSize(true);
@@ -118,23 +124,86 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
             // --- Database Sync ---
             if (newFavorite) {
                 // If it's a new favorite, convert to a SpotsItem and save to the database.
-                spotsDao.upsert(toSpot(updated));
-                Log.d("Marinas", "Added to DB: " + updated.name);
+                SpotsItem spot = toSpot(updated);
+                String docId = spot.getPlaceId();
+                spotsRepo.upsertSpotById(docId, spot,
+                        () -> {
+                    Toast.makeText(requireContext(),
+                                "Added to favorites: " + updated.name,
+                                Toast.LENGTH_SHORT).show();
+                            Log.d("Marinas", "Added to DB: " + updated.name);
+                            },
+                e  -> {
+                    Toast.makeText(requireContext(),
+                                "Failed to add favorite: " + e.getMessage(),
+                                Toast.LENGTH_LONG).show();
+                    Log.e("Marinas", "Failed to add to DB: " + e.getMessage());
+                    updated.setFavorite(false);
+                    marinaAdapter.notifyDataSetChanged();
+                });
+
             } else {
                 // If it's no longer a favorite, remove it from the database using its unique placeId.
-                spotsDao.deleteByPlaceId(updated.placeId);
-                Log.d("Marinas", "Removed from DB: " + updated.name);
+                spotsRepo.deleteSpotById(updated.placeId,
+                        () -> {
+                            Toast.makeText(requireContext(),
+                                    "Removed from favorites: " + updated.name,
+                                    Toast.LENGTH_SHORT).show();
+                            Log.d("Marinas", "Removed from DB: " + updated.name);
+                        },
+                        e -> {
+                            Toast.makeText(requireContext(),
+                                    "Failed to remove favorite: " + e.getMessage(),
+                                    Toast.LENGTH_LONG).show();
+                            Log.e("Marinas", "Error removing from DB: " + updated.name, e);
+                            updated.setFavorite(true);
+                            marinaAdapter.notifyDataSetChanged();
+                        });
             }
         });
         recyclerMarinas.setAdapter(marinaAdapter);
 
         // --- Initial Data Load ---
         seedDummyMarinas(); // TODO: Replace with actual location-based map query.
-        syncFavoritesFromDatabase();
 
         // --- Final Setup ---
         setupMapFragment(savedInstanceState);
         setupSearchView();
+    }
+
+    @Override public void onStart() {
+        super.onStart();
+        favReg = spotsRepo.listenFavoriteIds(ids -> {
+            favoriteIdsLive = ids;
+            recomputeMergedAndSubmit();  // recompute using latest allMarinas + live IDs
+        }, e -> {
+            Log.e("Spots", "favorites listen failed", e);
+            Toast.makeText(requireContext(), "Failed to listen to favorites", Toast.LENGTH_SHORT).show();
+        });
+    }
+
+    @Override public void onStop() {
+        super.onStop();
+        if (favReg != null) { favReg.remove(); favReg = null; }
+    }
+
+    private void recomputeMergedAndSubmit() {
+        if (allMarinas == null) return;
+
+        List<MarinaItem> merged = new ArrayList<>(allMarinas.size());
+        for (MarinaItem m : allMarinas) {
+            boolean isFavorite = favoriteIdsLive.contains(m.placeId);
+            merged.add(new MarinaItem(
+                    m.name, m.address, m.placeId, m.latLng, m.distanceMiles, isFavorite
+            ));
+        }
+        marinaAdapter.submitList(merged);
+    }
+
+    private void setMarinasAndRefresh(List<MarinaItem> loadedMarinas) {
+        // Keep an immutable copy for ListAdapter/DiffUtil correctness
+        this.allMarinas = new ArrayList<>(loadedMarinas);
+        recomputeMergedAndSubmit();  // merges with favoriteIdsLive and updates the adapter
     }
 
     /**
@@ -153,7 +222,7 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
         dummyMarinas.add(new MarinaItem("Hoboken Cove Boathouse", "Frank Sinatra Dr", "id9", new LatLng(40.748, -74.025), 5.5, false));
         dummyMarinas.add(new MarinaItem("Weehawken-Port Imperial", "4800 Ave at Port Imperial", "id10", new LatLng(40.78, -74.01), 7.0, false));
         allMarinas = new ArrayList<>(dummyMarinas);
-        marinaAdapter.submitList(allMarinas);
+        setMarinasAndRefresh(allMarinas);
     }
 
     /**
@@ -173,29 +242,6 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
         }
         spot.setFavorite(true); // Assumes this is called when an item becomes a favorite.
         return spot;
-    }
-
-    /**
-     * Fetches favorite items from the database and updates the UI list to reflect their status.
-     */
-    private void syncFavoritesFromDatabase() {
-        // Get all saved spots and store their placeIds in a Set for fast lookup.
-        List<SpotsItem> favorites = spotsDao.getAll();
-        Set<String> favoriteIds = new HashSet<>();
-        for (SpotsItem s : favorites) {
-            favoriteIds.add(s.getPlaceId());
-        }
-
-        // Create a new list, updating the favorite state of each marina.
-        List<MarinaItem> merged = new ArrayList<>(allMarinas.size());
-        for (MarinaItem m : allMarinas) {
-            boolean isFavorite = favoriteIds.contains(m.placeId);
-            merged.add(new MarinaItem(
-                    m.name, m.address, m.placeId, m.latLng, m.distanceMiles, isFavorite
-            ));
-        }
-        // Update the adapter with the synchronized list.
-        marinaAdapter.submitList(merged);
     }
 
     /**

@@ -7,6 +7,7 @@ import android.database.sqlite.SQLiteOpenHelper;
 /**
  * Manages database creation and version management for the application's SQLite database.
  */
+@Deprecated
 public class SpotsDbHelper extends SQLiteOpenHelper {
 
     /**
