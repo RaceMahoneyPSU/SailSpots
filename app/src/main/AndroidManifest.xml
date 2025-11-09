@@ -20,6 +20,15 @@
             android:name="com.google.android.geo.API_KEY"
             android:value="${MAPS_API_KEY}"/>
         <activity
+            android:name=".ui.LauncherActivity"
+            android:exported="true"
+            android:theme="@style/Theme.SailSpots.Splash">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity>
+        <activity
             android:name=".auth.RegisterActivity"
             android:exported="false"
             android:label="@string/title_register"
@@ -29,10 +38,6 @@
             android:exported="true"
             android:label="@string/login_title"
             android:theme="@style/Theme.SailSpots.NoActionBar">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
         </activity>
         <activity
             android:name=".MainActivity"
