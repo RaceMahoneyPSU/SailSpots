@@ -13,6 +13,7 @@ import java.util.List;
  * Data Access Object (DAO) for SpotsItem.
  * This class handles all database operations (CRUD) for the 'spots' table.
  */
+@Deprecated
 public class SpotsDao {
     // Database helper for creating and managing the database connection.
     private final SpotsDbHelper helper;
