@@ -7,6 +7,7 @@ import android.widget.ImageButton;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.recyclerview.widget.DiffUtil;
 import androidx.recyclerview.widget.ListAdapter;
 import androidx.recyclerview.widget.RecyclerView;
@@ -35,7 +36,13 @@ public class MarinaAdapter extends ListAdapter<MarinaItem, MarinaAdapter.VH> {
         void onFavoriteClick(@NonNull MarinaItem item, int position);
     }
 
+    public interface OnMarinaClickListener {
+        void onMarinaClick(@NonNull MarinaItem item, int position);
+    }
+
     private final OnFavoriteClickListener favoriteClickListener;
+    private OnMarinaClickListener marinaClickListener;
+
 
     /**
      * Constructor for the adapter.
@@ -46,6 +53,11 @@ public class MarinaAdapter extends ListAdapter<MarinaItem, MarinaAdapter.VH> {
         this.favoriteClickListener = favoriteClickListener;
         setHasStableIds(true); // Enable stable IDs for better animations.
     }
+
+    public void setOnMarinaClickListener(@Nullable OnMarinaClickListener listener) {
+        this.marinaClickListener = listener;
+    }
+
 
     /**
      * DiffUtil configuration to calculate list changes efficiently.
@@ -109,7 +121,7 @@ public class MarinaAdapter extends ListAdapter<MarinaItem, MarinaAdapter.VH> {
      */
     @Override
     public void onBindViewHolder(@NonNull VH holder, int position) {
-        holder.bind(getItem(position), position, favoriteClickListener);
+        holder.bind(getItem(position), position, favoriteClickListener, marinaClickListener);
     }
 
     /**
@@ -149,15 +161,28 @@ public class MarinaAdapter extends ListAdapter<MarinaItem, MarinaAdapter.VH> {
             btnFavorite = itemView.findViewById(R.id.btnFavorite);
         }
 
+        void bind(MarinaItem item,
+                  int position,
+                  @Nullable OnFavoriteClickListener favListener) {
+            bind(item, position, favListener, null);
+        }
+
         /**
          * Binds a MarinaItem's data to the views (a "full" bind).
          * @param item The data item to display.
          * @param position The position of the item.
          * @param favListener The listener for favorite button clicks.
          */
-        void bind(MarinaItem item, int position, OnFavoriteClickListener favListener) {
+        void bind(MarinaItem item,
+                  int position,
+                  @Nullable OnFavoriteClickListener favListener,
+                  @Nullable OnMarinaClickListener marinaClickListener) {
+
             tvTitle.setText(item.name);
-            tvSubtitle.setText(item.address + (item.distanceMiles > 0 ? String.format(" — %.1f mi", item.distanceMiles) : ""));
+            tvSubtitle.setText(
+                    item.address +
+                            (item.distanceMiles > 0 ? String.format(" — %.1f mi", item.distanceMiles) : "")
+            );
 
             // Set the visual state of the favorite button.
             btnFavorite.setImageResource(R.drawable.favorite_heart_selector);
@@ -169,17 +194,23 @@ public class MarinaAdapter extends ListAdapter<MarinaItem, MarinaAdapter.VH> {
                 if (p == RecyclerView.NO_POSITION) return; // Ignore clicks during layout changes.
                 if (favListener != null) favListener.onFavoriteClick(item, p);
             });
+
+            // Whole-row click -> open detail page
+            itemView.setOnClickListener(v -> {
+                int p = getBindingAdapterPosition();
+                if (p == RecyclerView.NO_POSITION) return; // Ignore clicks during layout changes.
+                if (marinaClickListener != null) marinaClickListener.onMarinaClick(item, p);
+            });
+
+            }
+            /**
+             * Updates only the favorite button's state (a "partial" bind).
+             * This is more efficient than rebinding the entire view.
+             * @param item The data item with the updated favorite status.
+             */
+            void bindFavoriteOnly(MarinaItem item) {
+                btnFavorite.setSelected(item.isFavorite());
+            }
         }
-
-        /**
-         * Updates only the favorite button's state (a "partial" bind).
-         * This is more efficient than rebinding the entire view.
-         * @param item The data item with the updated favorite status.
-         */
-        void bindFavoriteOnly(MarinaItem item) {
-            btnFavorite.setSelected(item.isFavorite());
-        }
-
-
     }
-}
+
