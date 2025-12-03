@@ -1,12 +1,8 @@
 package com.example.sailspots;
 
 import android.os.Bundle;
-import android.view.View;
 import android.view.Menu;
 
-import com.example.sailspots.data.SpotsDao;
-import com.example.sailspots.models.SpotsItem;
-import com.google.android.material.snackbar.Snackbar;
 import com.google.android.material.navigation.NavigationView;
 
 import androidx.navigation.NavController;
@@ -18,8 +14,6 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import com.example.sailspots.databinding.ActivityMainBinding;
 
-import java.util.List;
-
 public class MainActivity extends AppCompatActivity {
 
     private AppBarConfiguration mAppBarConfiguration;
@@ -28,8 +22,6 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
-        SpotsDao dao = new SpotsDao(this);
 
         binding = ActivityMainBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());

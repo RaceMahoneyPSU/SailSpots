@@ -2,6 +2,7 @@ package com.example.sailspots.ui.maps;
 
 import android.Manifest;
 import android.content.pm.PackageManager;
+import android.content.Intent;
 import android.location.Address;
 import android.location.Geocoder;import android.os.Bundle;
 import android.util.Log;
@@ -22,10 +23,10 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.sailspots.R;
 import com.example.sailspots.data.MarinaAdapter;
-import com.example.sailspots.data.SpotsDao;
 import com.example.sailspots.data.SpotsRepository;
 import com.example.sailspots.models.MarinaItem;
 import com.example.sailspots.models.SpotsItem;
+import com.example.sailspots.ui.detail.MarinaDetailActivity;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
@@ -98,7 +99,7 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
     public void onViewCreated(@NonNull View root, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(root, savedInstanceState);
 
-        // --- View and DAO Initialization ---
+        // --- View Initialization ---
         searchView = root.findViewById(R.id.idSearchView);
         spotsRepo = new SpotsRepository();
         recyclerMarinas = root.findViewById(R.id.recyclerMarinas);
@@ -161,6 +162,19 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
                         });
             }
         });
+
+        marinaAdapter.setOnMarinaClickListener((item, position) -> {
+            Intent intent = new Intent(requireContext(), MarinaDetailActivity.class);
+            intent.putExtra(MarinaDetailActivity.EXTRA_MARINA_NAME, item.name);
+            intent.putExtra(MarinaDetailActivity.EXTRA_MARINA_ADDRESS, item.address);
+            intent.putExtra(MarinaDetailActivity.EXTRA_PLACE_ID, item.placeId);
+            if (item.latLng != null) {
+                intent.putExtra(MarinaDetailActivity.EXTRA_LAT, item.latLng.latitude);
+                intent.putExtra(MarinaDetailActivity.EXTRA_LNG, item.latLng.longitude);
+            }
+            startActivity(intent);
+        });
+
         recyclerMarinas.setAdapter(marinaAdapter);
 
         // --- Initial Data Load ---
