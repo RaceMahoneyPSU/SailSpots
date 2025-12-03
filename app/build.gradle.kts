@@ -26,7 +26,9 @@ android {
         }
         val mapsKey = props.getProperty("MAPS_API_KEY") ?: ""
         manifestPlaceholders["MAPS_API_KEY"] = mapsKey
+        resValue("string", "google_maps_key", mapsKey)
     }
+
 
     buildTypes {
         release {
