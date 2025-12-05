@@ -33,4 +33,6 @@
     <string name="spot_image">Spot image</string>
     <string name="mark_favorite">Mark as favorite</string>
     <string name="show_details">Show details</string>
+    <string name="title_maps">Map</string>
+    <string name="title_favorites">Favorites</string>
 </resources>

@@ -1,6 +1,8 @@
 package com.example.sailspots.ui.maps;
 
 import android.Manifest;
+import android.content.Context;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.content.Intent;
 import android.location.Address;
@@ -69,8 +71,13 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
 
     // Distance constants.
     private static final double METERS_IN_MILE = 1609.34;
-    // Default radius (10 miles) for initial search
+    private static final double METERS_IN_KM = 1000.0;
+    // Default radius (10 miles) for initial
     private static final double DEFAULT_RADIUS_METERS = 10 * METERS_IN_MILE;
+
+    // SharedPreferences keys (must match SettingsFragment).
+    private static final String PREFS_NAME = "SailSpotsPrefs";
+    private static final String KEY_USE_KM = "use_km";
 
     // --- UI and Data Components ---
     private GoogleMap mMap;
@@ -83,6 +90,7 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
     // Current filter state.
     private String currentTypeFilter = "marinas";
     private double currentRadiusMeters = DEFAULT_RADIUS_METERS;
+    private boolean useKilometers = false;  // read from settings
 
     // Mapping from placeId -> marker so we can sync map <-> list.
     private final Map<String, Marker> markerByPlaceId = new HashMap<>();
@@ -113,8 +121,7 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
     /**
      * Default constructor for the fragment. Required for fragment instantiation.
      */
-    public MapsFragment() {
-    }
+    public MapsFragment() { }
 
     /**
      * Inflates the fragment's layout.
@@ -144,8 +151,14 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
         recyclerMarinas.setLayoutManager(new LinearLayoutManager(requireContext()));
         recyclerMarinas.setHasFixedSize(true);
 
-        // --- Adapter Setup ---
-        // Initialize the adapter and define the favorite button click behavior.
+        // Load unit preference from settings
+        SharedPreferences prefs = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+        useKilometers = prefs.getBoolean(KEY_USE_KM, false);
+        // Set initial radius according to current unit (10 km or 10 mi)
+        currentRadiusMeters = useKilometers ? 10 * METERS_IN_KM : 10 * METERS_IN_MILE;
+
+        // Adapter Setup
+        // Initialize the adapter and define the favorite button click behavior
         marinaAdapter = new MarinaAdapter((item, position) -> {
             // Create a mutable copy of the current list from the adapter.
             List<MarinaItem> current = new ArrayList<>(marinaAdapter.getCurrentList());
@@ -154,7 +167,7 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
 
             // Create an updated item with the new favorite state.
             MarinaItem updated = new MarinaItem(
-                    old.name, old.address, old.placeId, old.latLng, old.distanceMiles, newFavorite
+                    old.name, old.address, old.placeId, old.latLng, old.distanceMeters, newFavorite
             );
             // Replace the old item with the updated one and submit the new list.
             current.set(position, updated);
@@ -245,6 +258,18 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
         }
     }
 
+    /**
+     * Public method to be called by MainActivity before signing out.
+     * This ensures the listener is detached before auth state changes.
+     */
+    public void onSignOut() {
+        Log.d(TAG, "onSignOut called, removing listener.");
+        if (favReg != null) {
+            favReg.remove();
+            favReg = null;
+        }
+    }
+
     private void recomputeMergedAndSubmit() {
         if (allMarinas == null) return;
 
@@ -252,7 +277,7 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
         for (MarinaItem m : allMarinas) {
             boolean isFavorite = favoriteIdsLive.contains(m.placeId);
             merged.add(new MarinaItem(
-                    m.name, m.address, m.placeId, m.latLng, m.distanceMiles, isFavorite
+                    m.name, m.address, m.placeId, m.latLng, m.distanceMeters, isFavorite
             ));
         }
         marinaAdapter.submitList(merged);
@@ -352,7 +377,7 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
             );
             typeAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
             spinnerType.setAdapter(typeAdapter);
-            spinnerType.setSelection(0); // default "marinas"
+            spinnerType.setSelection(0); // default "Marinas"
 
             spinnerType.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
                 @Override
@@ -366,14 +391,19 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
                 }
 
                 @Override
-                public void onNothingSelected(AdapterView<?> parent) {
-                }
+                public void onNothingSelected(AdapterView<?> parent) { }
             });
         }
 
         if (spinnerDistance != null) {
-            // Distance options in miles.
-            List<String> distances = Arrays.asList("10 mi", "20 mi", "30 mi");
+            // Distance options depending on unit preference.
+            List<String> distances;
+            if (useKilometers) {
+                distances = Arrays.asList("10 km", "20 km", "30 km");
+            } else {
+                distances = Arrays.asList("10 mi", "20 mi", "30 mi");
+            }
+
             ArrayAdapter<String> distanceAdapter = new ArrayAdapter<>(
                     requireContext(),
                     android.R.layout.simple_spinner_item,
@@ -381,22 +411,27 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
             );
             distanceAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
             spinnerDistance.setAdapter(distanceAdapter);
-            spinnerDistance.setSelection(0); // default "10 mi"
+            spinnerDistance.setSelection(0); // default "10"
 
             spinnerDistance.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
                 @Override
                 public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                     String label = (String) parent.getItemAtPosition(position);
-                    // Update radius based on selection.
-                    if (label.startsWith("10")) {
-                        currentRadiusMeters = 10 * METERS_IN_MILE;
-                    } else if (label.startsWith("20")) {
-                        currentRadiusMeters = 20 * METERS_IN_MILE;
-                    } else if (label.startsWith("30")) {
-                        currentRadiusMeters = 30 * METERS_IN_MILE;
-                    } else {
-                        currentRadiusMeters = DEFAULT_RADIUS_METERS;
+                    // Extract numeric part (e.g., "10" from "10 km" / "10 mi").
+                    int valueKmOrMi;
+                    try {
+                        valueKmOrMi = Integer.parseInt(label.split(" ")[0]);
+                    } catch (Exception e) {
+                        valueKmOrMi = 10;
                     }
+
+                    // Update radius in meters based on unit.
+                    if (useKilometers) {
+                        currentRadiusMeters = valueKmOrMi * METERS_IN_KM;
+                    } else {
+                        currentRadiusMeters = valueKmOrMi * METERS_IN_MILE;
+                    }
+
                     // Re-run the search at the current map center.
                     if (mMap != null) {
                         LatLng center = mMap.getCameraPosition().target;
@@ -405,8 +440,7 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
                 }
 
                 @Override
-                public void onNothingSelected(AdapterView<?> parent) {
-                }
+                public void onNothingSelected(AdapterView<?> parent) { }
             });
         }
     }
@@ -550,11 +584,11 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
     @NonNull
     private List<String> getPrimaryTypesForFilter(@NonNull String filterType) {
         String lower = filterType.toLowerCase(Locale.US);
-        List ret = Arrays.asList("marina");
-        if (lower == "beaches") {
-            ret = Arrays.asList("beach");
+        if ("beaches".equals(lower)) {
+            return Arrays.asList("beach");
         }
-        return ret;
+        // "Marinas" and "Docks" both start from primary type "marina".
+        return Arrays.asList("marina");
     }
 
     /**
@@ -574,7 +608,8 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
                     || name.contains("harbour")
                     || addr.contains("marina")
                     || addr.contains("yacht")
-                    || addr.contains("harbor");
+                    || addr.contains("harbor")
+                    || addr.contains("harbour");
         } else if ("docks".equals(lowerFilter)) {
             // Boating docks / landings
             return name.contains("dock")
@@ -631,20 +666,27 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
                 // Extra filtering by type based on name/address.
                 if (!matchesTypeFilter(place, filterType)) continue;
 
-                // Compute distance from the search center in miles.
+                // Compute distance from the search center in either miles or kilometers.
                 float[] results = new float[1];
                 Location.distanceBetween(centerLatLng.latitude, centerLatLng.longitude,
                         place.getLatLng().latitude, place.getLatLng().longitude, results);
-                double distanceMiles = results[0] / METERS_IN_MILE;
+
+                double distance;
+                if (useKilometers) {
+                    distance = results[0] / METERS_IN_KM;
+                } else {
+                    distance = results[0] / METERS_IN_MILE;
+                }
 
                 boolean isFavorite = favoriteIdsLive.contains(place.getId());
 
+                // NOTE: distanceMiles now stores distance in *current units* (mi or km).
                 foundMarinas.add(new MarinaItem(
                         place.getName(),
                         place.getAddress(),
                         place.getId(),
                         place.getLatLng(),
-                        distanceMiles,
+                        distance,
                         isFavorite
                 ));
             }
