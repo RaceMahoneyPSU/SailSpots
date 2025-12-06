@@ -1,14 +1,19 @@
 package com.example.sailspots.ui.detail;
+import com.example.sailspots.BuildConfig;
 
+import android.graphics.Color;
+import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.widget.TextView;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.sailspots.R;
+import com.example.sailspots.network.WeatherClient;
 import com.google.android.material.appbar.MaterialToolbar;
 import com.google.firebase.firestore.CollectionReference;
 import com.google.firebase.firestore.DocumentSnapshot;
@@ -26,6 +31,7 @@ import android.widget.RatingBar;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AlertDialog;
+import android.animation.ArgbEvaluator;
 
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.firebase.Timestamp;
@@ -55,6 +61,8 @@ public class MarinaDetailActivity extends AppCompatActivity {
     private CollectionReference commentsRef; // Reference to the 'comments' sub-collection for this marina.
     private ListenerRegistration commentsRegistration; // Listens for real-time updates to comments.
     private String placeId; // The unique ID for the marina (spot) in Firestore.
+    private WeatherClient weatherClient;
+    private View panelWeather;
 
 
     @Override
@@ -103,23 +111,65 @@ public class MarinaDetailActivity extends AppCompatActivity {
         tvMarinaName.setText(name != null ? name : "Unknown");
         tvMarinaAddress.setText(address != null ? address : "Unknown");
 
-        // Lat/Lng for future weather integration.
+
+        // --- Weather Fetching ---
+        // Get a reference to the weather panel view.
+        panelWeather = findViewById(R.id.panelWeather);
+        // Initialize the WeatherClient for making API calls.
+        weatherClient = new WeatherClient();
+        // Retrieve latitude and longitude from the intent.
         double lat = getIntent().getDoubleExtra(EXTRA_LAT, Double.NaN);
         double lng = getIntent().getDoubleExtra(EXTRA_LNG, Double.NaN);
 
-        // ---- Weather mock hookup (for now just fake data) ----
+        // Retrieve the secure API key from string resources.
+        String apiKey = BuildConfig.OPENWEATHER_API_KEY;
+
+        // Find all the TextViews within the weather panel.
         TextView tvWeatherTemp = findViewById(R.id.tvWeatherTemp);
         TextView tvWeatherCondition = findViewById(R.id.tvWeatherCondition);
         TextView tvWeatherHiLo = findViewById(R.id.tvWeatherHiLo);
         TextView tvWeatherWind = findViewById(R.id.tvWeatherWind);
         TextView tvWeatherExtra = findViewById(R.id.tvWeatherExtra);
 
-        // TODO Later: replace with real API call using lat/lng.
-        tvWeatherTemp.setText("78°");
-        tvWeatherCondition.setText("Partly cloudy");
-        tvWeatherHiLo.setText("H 82°  •  L 72°");
-        tvWeatherWind.setText("Wind 9 kt");
-        tvWeatherExtra.setText("Tide: rising");
+        // Only attempt to fetch weather if we have valid coordinates.
+        if (!Double.isNaN(lat) && !Double.isNaN(lng)) {
+            // Start the asynchronous weather data request.
+            weatherClient.fetchCurrentWeather(lat, lng, apiKey, new WeatherClient.WeatherCallback() {
+                @Override
+                public void onSuccess(WeatherClient.WeatherResult result) {
+                    // This block runs on the main thread when the weather data is successfully retrieved.
+                    // Update UI TextViews with the formatted weather data.
+                    tvWeatherTemp.setText(String.format("%.0f°", result.tempF));
+                    tvWeatherCondition.setText(result.condition);
+                    tvWeatherHiLo.setText(String.format("H: %.0f° L: %.0f°", result.tempMaxF, result.tempMinF));
+
+                    // Convert wind speed from meters/second to knots for display.
+                    double windKts = result.windSpeedMps * 1.94384;
+                    tvWeatherWind.setText(String.format("Wind %.0f knots", windKts));
+                    tvWeatherExtra.setText("Live conditions");
+
+                    // Apply a dynamic background gradient based on the current temperature.
+                    applyTemperatureBackground(result.tempF);
+                }
+
+                @Override
+                public void onFailure(@NonNull Exception e) {
+                    // This block runs on the main thread if the API call fails.
+                    // Display placeholder text indicating that weather is unavailable.
+                    tvWeatherCondition.setText("Weather unavailable");
+                    tvWeatherTemp.setText("--°");
+                    tvWeatherHiLo.setText("H --°  •  L --°");
+                    tvWeatherWind.setText("Wind --");
+                    tvWeatherExtra.setText("");
+
+                    // Apply a neutral, default background color on failure.
+                    applyTemperatureBackground(72.0);
+
+                    // Log the detailed error to Logcat for debugging purposes.
+                    android.util.Log.e("Weather", "Failed to fetch weather", e);
+                }
+            });
+        }
 
         // --- RecyclerView for comments ---
         rvComments = findViewById(R.id.rvComments);
@@ -273,6 +323,55 @@ public class MarinaDetailActivity extends AppCompatActivity {
         ));
         return list;
     }
+
+    /**
+     * Dynamically sets the background of the weather panel to a gradient
+     * that reflects the current temperature, from cool blues to warm oranges.
+     *
+     * @param tempF The current temperature in Fahrenheit.
+     */
+    /**
+     * Dynamically sets the background of the weather panel to a gradient
+     * that reflects the current temperature, from cool blues to warm oranges.
+     *
+     * @param tempF The current temperature in Fahrenheit.
+     */
+    private void applyTemperatureBackground(double tempF) {
+        // Safety check to ensure the panel view exists and the temperature is a valid number.
+        if (panelWeather == null || Double.isNaN(tempF)) {
+            return;
+        }
+
+        // Define the temperature range for the color gradient (e.g., 32°F to 95°F).
+        double minT = 32.0;
+        double maxT = 95.0;
+        // Clamp the actual temperature to stay within the defined min/max range.
+        double clamped = Math.max(minT, Math.min(maxT, tempF));
+        // Calculate the ratio (0.0 to 1.0) of the clamped temperature within the range.
+        // A ratio of 0.0 represents the coldest point, and 1.0 represents the hottest.
+        float ratio = (float) ((clamped - minT) / (maxT - minT));
+
+        // Define the start (cold) and end (hot) colors for the gradient.
+        int coldColor = Color.parseColor("#E3F2FD"); // A light blue
+        int hotColor  = Color.parseColor("#FFE0B2"); // A light orange/peach
+
+        // Use an ArgbEvaluator to calculate the intermediate color based on the ratio.
+        ArgbEvaluator evaluator = new ArgbEvaluator();
+        int startColor = (int) evaluator.evaluate(ratio, coldColor, hotColor);
+        // The bottom of the gradient will always fade to white for a clean look.
+        int endColor = Color.WHITE;
+
+        // Create a top-to-bottom gradient drawable with the calculated start and end colors.
+        GradientDrawable gradient = new GradientDrawable(
+                GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[]{startColor, endColor});
+        // Ensure the gradient has sharp corners (no corner radius).
+        gradient.setCornerRadius(0f);
+
+        // Apply the newly created gradient to the weather panel's background.
+        panelWeather.setBackground(gradient);
+    }
+
 
     /**
      * Called when the activity is being destroyed.
