@@ -1,8 +1,11 @@
 # SailSpots
 
 **Course:** SWENG 888 Mobile Comp & Apps
+<br>
 **Professor:** Everton Guimaraes, Ph.D
+<br>
 **Author:** Race Mahoney & Brandon Bagby
+<br>
 
 ## Table of Contents
 1. [Project Overview](#project-overview)
