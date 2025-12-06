@@ -330,12 +330,6 @@ public class MarinaDetailActivity extends AppCompatActivity {
      *
      * @param tempF The current temperature in Fahrenheit.
      */
-    /**
-     * Dynamically sets the background of the weather panel to a gradient
-     * that reflects the current temperature, from cool blues to warm oranges.
-     *
-     * @param tempF The current temperature in Fahrenheit.
-     */
     private void applyTemperatureBackground(double tempF) {
         // Safety check to ensure the panel view exists and the temperature is a valid number.
         if (panelWeather == null || Double.isNaN(tempF)) {
@@ -371,7 +365,6 @@ public class MarinaDetailActivity extends AppCompatActivity {
         // Apply the newly created gradient to the weather panel's background.
         panelWeather.setBackground(gradient);
     }
-
 
     /**
      * Called when the activity is being destroyed.
