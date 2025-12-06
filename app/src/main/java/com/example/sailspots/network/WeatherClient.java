@@ -40,14 +40,14 @@ public class WeatherClient {
         public final double tempF;
         public final double tempMinF;
         public final double tempMaxF;
-        public final double windSpeedMps; // Wind speed in meters per second.
+        public final double windSpeedMph; // Wind speed in mile per hour.
         public final String condition;    // A description of the weather (e.g., "Partly cloudy").
 
-        public WeatherResult(double tempF, double tempMinF, double tempMaxF, double windSpeedMps, @NonNull String condition) {
+        public WeatherResult(double tempF, double tempMinF, double tempMaxF, double windSpeedMph, @NonNull String condition) {
             this.tempF = tempF;
             this.tempMinF = tempMinF;
             this.tempMaxF = tempMaxF;
-            this.windSpeedMps = windSpeedMps;
+            this.windSpeedMph = windSpeedMph;
             this.condition = condition;
         }
     }

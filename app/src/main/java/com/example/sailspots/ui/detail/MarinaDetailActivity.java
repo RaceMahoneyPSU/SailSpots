@@ -143,8 +143,8 @@ public class MarinaDetailActivity extends AppCompatActivity {
                     tvWeatherCondition.setText(result.condition);
                     tvWeatherHiLo.setText(String.format("H: %.0f° L: %.0f°", result.tempMaxF, result.tempMinF));
 
-                    // Convert wind speed from meters/second to knots for display.
-                    double windKts = result.windSpeedMps * 1.94384;
+                    // Convert wind speed from miles per hour to knots for display.
+                    double windKts = result.windSpeedMph * 0.868976;
                     tvWeatherWind.setText(String.format("Wind %.0f knots", windKts));
                     tvWeatherExtra.setText("Live conditions");
 
