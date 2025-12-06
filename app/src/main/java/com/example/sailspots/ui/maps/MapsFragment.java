@@ -356,7 +356,7 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
      */
     private void initializePlacesClient() {
         if (!Places.isInitialized()) {
-            // Use your API key from resources.
+            // Use API key from resources.
             String apiKey = getString(R.string.google_maps_key);
             Places.initialize(requireContext().getApplicationContext(), apiKey);
         }
