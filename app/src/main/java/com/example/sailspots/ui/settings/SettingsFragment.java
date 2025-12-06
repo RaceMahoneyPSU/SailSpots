@@ -22,16 +22,26 @@ import com.google.firebase.auth.EmailAuthProvider;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 
+/**
+ * Fragment responsible for managing user preferences and account settings.
+ *
+ * Features:
+ * - Toggling distance units (Miles vs. Kilometers).
+ * - Updating the user's password (requires re-authentication).
+ */
 public class SettingsFragment extends Fragment {
 
+    // SharedPreferences keys.
+    public static final String PREFS_NAME = "SailSpotsPrefs";
+    public static final String KEY_USE_KM = "use_km";
+
+    // --- UI Components ---
     private SwitchMaterial switchUnits;
     private TextInputEditText etNewPassword, etCurrentPassword;
     private Button btnUpdatePassword;
-    private SharedPreferences prefs;
 
-    // Key for storing the preference
-    public static final String PREFS_NAME = "SailSpotsPrefs";
-    public static final String KEY_USE_KM = "use_km";
+    // --- Data Components ---
+    private SharedPreferences prefs;
 
     @Nullable
     @Override
@@ -43,33 +53,33 @@ public class SettingsFragment extends Fragment {
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
 
-        // Init Views
+        // --- View Initialization ---
         switchUnits = view.findViewById(R.id.switchUnits);
         etNewPassword = view.findViewById(R.id.etNewPassword);
         etCurrentPassword = view.findViewById(R.id.etCurrentPassword);
         btnUpdatePassword = view.findViewById(R.id.btnUpdatePassword);
 
-        // Init Prefs
+        // --- Preferences Setup ---
         prefs = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
 
-        // Setup Switch State
+        // Restore current switch state.
         boolean isKm = prefs.getBoolean(KEY_USE_KM, false);
         switchUnits.setChecked(isKm);
 
-        // Listener for Switch
+        // Save preference changes immediately when toggled.
         switchUnits.setOnCheckedChangeListener((buttonView, isChecked) -> {
             prefs.edit().putBoolean(KEY_USE_KM, isChecked).apply();
             String unit = isChecked ? "Kilometers" : "Miles";
             Toast.makeText(requireContext(), "Units changed to " + unit, Toast.LENGTH_SHORT).show();
         });
 
-        // Setup Auth Listener for password update
+        // --- Password Update Setup ---
         btnUpdatePassword.setOnClickListener(v -> updatePassword());
     }
 
     /**
-     * Helper to re-authenticate the user with their current password,
-     * then run the provided action on success.
+     * Re-authenticates the user with their current password before allowing sensitive actions.
+     * Runs the onSuccess runnable if authentication passes.
      */
     private void reauthenticateThen(@NonNull String currentPassword, @NonNull Runnable onSuccess) {
         FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
@@ -98,8 +108,7 @@ public class SettingsFragment extends Fragment {
     }
 
     /**
-     * Updates the user's password.
-     * Requires entering the current password for re-authentication plus a new password.
+     * Validates input fields and updates the user's password in Firebase.
      */
     private void updatePassword() {
         String newPass = etNewPassword.getText() != null
@@ -109,6 +118,7 @@ public class SettingsFragment extends Fragment {
                 ? etCurrentPassword.getText().toString().trim()
                 : "";
 
+        // Input Validation.
         if (TextUtils.isEmpty(currentPass)) {
             etCurrentPassword.setError("Current password required");
             return;
@@ -122,6 +132,7 @@ public class SettingsFragment extends Fragment {
             return;
         }
 
+        // Re-authenticate, then Update.
         reauthenticateThen(currentPass, () -> {
             FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
             if (user == null) {
