@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:padding="16dp"
+    android:background="?android:attr/selectableItemBackground"
+    android:clickable="true"
+    android:focusable="true">
+
+    <TextView
+        android:id="@+id/marinaName"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:textAppearance="?attr/textAppearanceListItem"
+        android:textSize="16sp"
+        android:textStyle="bold"
+        app:layout_constraintEnd_toStartOf="@+id/distanceText"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        tools:text="Marina del Rey" />
+
+    <TextView
+        android:id="@+id/marinaAddress"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:textAppearance="?attr/textAppearanceListItemSecondary"
+        android:textSize="14sp"
+        app:layout_constraintEnd_toStartOf="@+id/favoriteIcon"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/marinaName"
+        tools:text="13977 Palawan Way, Marina Del Rey, CA 90292" />
+
+    <TextView
+        android:id="@+id/distanceText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="8dp"
+        android:textColor="@android:color/darker_gray"
+        android:textSize="12sp"
+        app:layout_constraintBottom_toTopOf="@id/favoriteIcon"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        tools:text="5.2 mi" />
+
+    <ImageView
+        android:id="@+id/favoriteIcon"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="8dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:clickable="true"
+        android:contentDescription="Favorite"
+        android:focusable="true"
+        android:padding="8dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/distanceText"
+        app:srcCompat="@drawable/ic_favorite_border_24"
+        tools:srcCompat="@drawable/ic_favorite_24" />
+
+</androidx.constraintlayout.widget.ConstraintLayout>
