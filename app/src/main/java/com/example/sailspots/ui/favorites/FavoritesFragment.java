@@ -19,10 +19,10 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.example.sailspots.R;
 import com.example.sailspots.data.MarinaAdapter;
 import com.example.sailspots.data.SpotsRepository;
-import com.example.sailspots.models.MarinaItem;
 import com.example.sailspots.models.SpotsItem;
 import com.example.sailspots.ui.detail.MarinaDetailActivity;
 import com.google.android.gms.maps.model.LatLng;
+import com.google.android.libraries.places.api.model.Place;
 import com.google.firebase.firestore.ListenerRegistration;
 
 import java.util.ArrayList;
@@ -83,9 +83,12 @@ public class FavoritesFragment extends Fragment {
         recyclerView.setHasFixedSize(true);
 
         // Initialize Adapter with click handlers
-        adapter = new MarinaAdapter((item, position) -> {
+        adapter = new MarinaAdapter((place, position) -> {
             // "Favorite Heart" click logic: In this screen, clicking the heart means REMOVING from favorites.
-            spotsRepo.deleteSpotById(item.placeId,
+            String id = place.getId();
+            if (id == null) return;
+
+            spotsRepo.deleteSpotById(id,
                     () -> Toast.makeText(requireContext(), "Removed from favorites", Toast.LENGTH_SHORT).show(),
                     e -> {
                         Toast.makeText(requireContext(), "Failed to remove", Toast.LENGTH_SHORT).show();
@@ -93,15 +96,15 @@ public class FavoritesFragment extends Fragment {
                     });
         });
 
-        adapter.setOnMarinaClickListener((item, position) -> {
+        adapter.setOnMarinaClickListener((place, position) -> {
             // "List Item" click logic: Open the detail view
             Intent intent = new Intent(requireContext(), MarinaDetailActivity.class);
-            intent.putExtra(MarinaDetailActivity.EXTRA_MARINA_NAME, item.name);
-            intent.putExtra(MarinaDetailActivity.EXTRA_MARINA_ADDRESS, item.address);
-            intent.putExtra(MarinaDetailActivity.EXTRA_PLACE_ID, item.placeId);
-            if (item.latLng != null) {
-                intent.putExtra(MarinaDetailActivity.EXTRA_LAT, item.latLng.latitude);
-                intent.putExtra(MarinaDetailActivity.EXTRA_LNG, item.latLng.longitude);
+            intent.putExtra(MarinaDetailActivity.EXTRA_MARINA_NAME, place.getName());
+            intent.putExtra(MarinaDetailActivity.EXTRA_MARINA_ADDRESS, place.getAddress());
+            intent.putExtra(MarinaDetailActivity.EXTRA_PLACE_ID, place.getId());
+            if (place.getLatLng() != null) {
+                intent.putExtra(MarinaDetailActivity.EXTRA_LAT, place.getLatLng().latitude);
+                intent.putExtra(MarinaDetailActivity.EXTRA_LNG, place.getLatLng().longitude);
             }
             startActivity(intent);
         });
@@ -112,15 +115,16 @@ public class FavoritesFragment extends Fragment {
     private void loadFavorites() {
         showLoading(true);
 
-        // Use listenFavoriteIds to give us a Set<String> of IDs.
-        // We then have to fetch the details for each.
         favoritesListener = spotsRepo.listenFavoriteIds(ids -> {
             if (ids == null || ids.isEmpty()) {
                 showLoading(false);
+                adapter.setFavoritePlaceIds(ids != null ? ids : Set.of());
                 updateUI(new ArrayList<>());
                 return;
             }
 
+            // Let adapter know which IDs are favorites (all of them here).
+            adapter.setFavoritePlaceIds(ids);
             fetchDetailsForIds(ids);
 
         }, e -> {
@@ -132,7 +136,7 @@ public class FavoritesFragment extends Fragment {
 
     // Helper to fetch full object details for a set of IDs one by one
     private void fetchDetailsForIds(Set<String> ids) {
-        List<MarinaItem> loadedItems = new ArrayList<>();
+        List<Place> loadedPlaces = new ArrayList<>();
         // We need to track when all async calls are done
         final int totalToLoad = ids.size();
         final int[] loadCount = {0};
@@ -140,50 +144,56 @@ public class FavoritesFragment extends Fragment {
         for (String id : ids) {
             spotsRepo.getSpot(id, spotItem -> {
                 if (spotItem != null) {
-                    loadedItems.add(toMarinaItem(spotItem));
+                    loadedPlaces.add(toPlace(spotItem));
                 }
                 loadCount[0]++;
 
                 // If this was the last item, update UI
                 if (loadCount[0] == totalToLoad) {
                     showLoading(false);
-                    updateUI(loadedItems);
+                    updateUI(loadedPlaces);
                 }
             }, e -> {
                 loadCount[0]++;
                 if (loadCount[0] == totalToLoad) {
                     showLoading(false);
-                    updateUI(loadedItems);
+                    updateUI(loadedPlaces);
                 }
             });
         }
     }
 
-    private void updateUI(List<MarinaItem> items) {
-        if (items.isEmpty()) {
+    private void updateUI(List<Place> places) {
+        if (places.isEmpty()) {
             textNoFavorites.setVisibility(View.VISIBLE);
             recyclerView.setVisibility(View.GONE);
             adapter.submitList(new ArrayList<>());
         } else {
             textNoFavorites.setVisibility(View.GONE);
             recyclerView.setVisibility(View.VISIBLE);
-            adapter.submitList(items);
+            adapter.submitList(places);
         }
     }
 
-    private MarinaItem toMarinaItem(SpotsItem spot) {
+    /**
+     * Converts a stored SpotsItem (favorite) into a lightweight Place object
+     * so it can be rendered by MarinaAdapter.
+     */
+    private Place toPlace(SpotsItem spot) {
         LatLng latLng = (spot.getLatitude() != 0 && spot.getLongitude() != 0)
                 ? new LatLng(spot.getLatitude(), spot.getLongitude())
                 : null;
 
-        return new MarinaItem(
-                spot.getName(),
-                spot.getAddress(),
-                spot.getPlaceId(),
-                latLng,
-                0.0,
-                true
-        );
+        Place.Builder builder = Place.builder()
+                .setId(spot.getPlaceId())
+                .setName(spot.getName())
+                .setAddress(spot.getAddress());
+
+        if (latLng != null) {
+            builder.setLatLng(latLng);
+        }
+
+        return builder.build();
     }
 
     private void showLoading(boolean isLoading) {

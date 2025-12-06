@@ -1,7 +1,5 @@
 package com.example.sailspots.data;
 
-import android.content.Context;
-import android.content.SharedPreferences;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -15,35 +13,40 @@ import androidx.recyclerview.widget.ListAdapter;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.sailspots.R;
-import com.example.sailspots.models.MarinaItem;
-import com.example.sailspots.ui.settings.SettingsFragment;
+import com.google.android.libraries.places.api.model.Place;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.Set;
 
 /**
- * A RecyclerView adapter that efficiently displays a list of MarinaItem objects.
+ * A RecyclerView adapter that efficiently displays a list of Place objects.
  * It uses ListAdapter and DiffUtil for optimized performance with dynamic data.
  */
-public class MarinaAdapter extends ListAdapter<MarinaItem, MarinaAdapter.VH> {
-
-    // Conversion constants
-    private static final double MILES_TO_KM = 1.60934;
+public class MarinaAdapter extends ListAdapter<Place, MarinaAdapter.VH> {
 
     /**
      * An interface to handle clicks on the favorite button in a list item.
      */
     public interface OnFavoriteClickListener {
-        void onFavoriteClick(@NonNull MarinaItem item, int position);
+        void onFavoriteClick(@NonNull Place place, int position);
     }
 
+    /**
+     * An interface to handle clicks on the row itself.
+     */
     public interface OnMarinaClickListener {
-        void onMarinaClick(@NonNull MarinaItem item, int position);
+        void onMarinaClick(@NonNull Place place, int position);
     }
 
     private final OnFavoriteClickListener favoriteClickListener;
     private OnMarinaClickListener marinaClickListener;
+
+    // Backing set of favorite Place IDs (kept in sync by the fragment).
+    @NonNull
+    private Set<String> favoritePlaceIds = Collections.emptySet();
 
     /**
      * Constructor for the adapter.
@@ -55,36 +58,48 @@ public class MarinaAdapter extends ListAdapter<MarinaItem, MarinaAdapter.VH> {
         setHasStableIds(true);
     }
 
+    /**
+     * Allows the fragment to provide/update the current set of favorite IDs.
+     */
+    public void setFavoritePlaceIds(@NonNull Set<String> ids) {
+        this.favoritePlaceIds = ids;
+        // Favorite state is derived from this set, so rebind all items.
+        notifyDataSetChanged();
+    }
+
     public void setOnMarinaClickListener(@Nullable OnMarinaClickListener listener) {
         this.marinaClickListener = listener;
     }
 
-    private static final DiffUtil.ItemCallback<MarinaItem> DIFF =
-            new DiffUtil.ItemCallback<MarinaItem>() {
+    private static final DiffUtil.ItemCallback<Place> DIFF =
+            new DiffUtil.ItemCallback<Place>() {
                 @Override
-                public boolean areItemsTheSame(@NonNull MarinaItem oldItem, @NonNull MarinaItem newItem) {
-                    return oldItem.placeId != null && oldItem.placeId.equals(newItem.placeId);
+                public boolean areItemsTheSame(@NonNull Place oldItem, @NonNull Place newItem) {
+                    return oldItem.getId() != null
+                            && oldItem.getId().equals(newItem.getId());
                 }
+
                 @Override
-                public boolean areContentsTheSame(@NonNull MarinaItem oldItem, @NonNull MarinaItem newItem) {
-                    return oldItem.isFavorite() == newItem.isFavorite()
-                            && Objects.equals(oldItem.name, newItem.name)
-                            && Objects.equals(oldItem.address, newItem.address)
-                            && Double.compare(oldItem.distanceMeters, newItem.distanceMeters) == 0;
+                public boolean areContentsTheSame(@NonNull Place oldItem, @NonNull Place newItem) {
+                    return Objects.equals(oldItem.getName(), newItem.getName())
+                            && Objects.equals(oldItem.getAddress(), newItem.getAddress());
                 }
+
                 @Override
-                public Object getChangePayload(@NonNull MarinaItem oldItem, @NonNull MarinaItem newItem) {
-                    return (oldItem.isFavorite() != newItem.isFavorite()) ? "favorite" : null;
+                public Object getChangePayload(@NonNull Place oldItem, @NonNull Place newItem) {
+                    // Favorite state is external to Place, so we don't detect it here.
+                    return null;
                 }
             };
 
     @Override
     public long getItemId(int position) {
-        MarinaItem item = getItem(position);
-        return (item.placeId != null) ? item.placeId.hashCode() : position;
+        Place item = getItem(position);
+        return (item.getId() != null) ? item.getId().hashCode() : position;
     }
 
-    @NonNull @Override
+    @NonNull
+    @Override
     public VH onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
         View v = LayoutInflater.from(parent.getContext())
                 .inflate(R.layout.row_marina, parent, false);
@@ -93,16 +108,7 @@ public class MarinaAdapter extends ListAdapter<MarinaItem, MarinaAdapter.VH> {
 
     @Override
     public void onBindViewHolder(@NonNull VH holder, int position) {
-        holder.bind(getItem(position), position, favoriteClickListener, marinaClickListener);
-    }
-
-    @Override
-    public void onBindViewHolder(@NonNull VH holder, int position, @NonNull List<Object> payloads) {
-        if (!payloads.isEmpty() && payloads.contains("favorite")) {
-            holder.bindFavoriteOnly(getItem(position));
-        } else {
-            super.onBindViewHolder(holder, position, payloads);
-        }
+        holder.bind(getItem(position), position, favoriteClickListener, marinaClickListener, favoritePlaceIds);
     }
 
     static class VH extends RecyclerView.ViewHolder {
@@ -117,50 +123,36 @@ public class MarinaAdapter extends ListAdapter<MarinaItem, MarinaAdapter.VH> {
             btnFavorite = itemView.findViewById(R.id.btnFavorite);
         }
 
-        void bind(MarinaItem item,
+        void bind(@NonNull Place place,
                   int position,
                   @Nullable OnFavoriteClickListener favListener,
-                  @Nullable OnMarinaClickListener marinaClickListener) {
+                  @Nullable OnMarinaClickListener marinaClickListener,
+                  @NonNull Set<String> favoritePlaceIds) {
 
-            tvTitle.setText(item.name);
+            tvTitle.setText(place.getName());
 
-            // --- UPDATED LOGIC: Handle Unit Conversion ---
-            Context context = itemView.getContext();
-            SharedPreferences prefs = context.getSharedPreferences(SettingsFragment.PREFS_NAME, Context.MODE_PRIVATE);
-            boolean useKm = prefs.getBoolean(SettingsFragment.KEY_USE_KM, false);
+            // For now we only show the address as subtitle.
+            String address = place.getAddress();
+            if (address == null) address = "";
+            tvSubtitle.setText(address);
 
-            String distanceString;
-            if (item.distanceMeters > 0) {
-                if (useKm) {
-                    double km = item.distanceMeters * MILES_TO_KM;
-                    distanceString = String.format(Locale.US, " — %.1f km", km);
-                } else {
-                    distanceString = String.format(Locale.US, " — %.1f mi", item.distanceMeters);
-                }
-            } else {
-                distanceString = "";
-            }
-
-            tvSubtitle.setText(item.address + distanceString);
+            // Determine favorite state from the provided set of IDs.
+            boolean isFavorite = place.getId() != null && favoritePlaceIds.contains(place.getId());
 
             btnFavorite.setImageResource(R.drawable.favorite_heart_selector);
-            btnFavorite.setSelected(item.isFavorite());
+            btnFavorite.setSelected(isFavorite);
 
             btnFavorite.setOnClickListener(v -> {
                 int p = getBindingAdapterPosition();
                 if (p == RecyclerView.NO_POSITION) return;
-                if (favListener != null) favListener.onFavoriteClick(item, p);
+                if (favListener != null) favListener.onFavoriteClick(place, p);
             });
 
             itemView.setOnClickListener(v -> {
                 int p = getBindingAdapterPosition();
                 if (p == RecyclerView.NO_POSITION) return;
-                if (marinaClickListener != null) marinaClickListener.onMarinaClick(item, p);
+                if (marinaClickListener != null) marinaClickListener.onMarinaClick(place, p);
             });
-        }
-
-        void bindFavoriteOnly(MarinaItem item) {
-            btnFavorite.setSelected(item.isFavorite());
         }
     }
 }

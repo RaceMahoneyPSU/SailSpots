@@ -31,7 +31,6 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.example.sailspots.R;
 import com.example.sailspots.data.MarinaAdapter;
 import com.example.sailspots.data.SpotsRepository;
-import com.example.sailspots.models.MarinaItem;
 import com.example.sailspots.models.SpotsItem;
 import com.example.sailspots.ui.detail.MarinaDetailActivity;
 import com.google.android.gms.maps.CameraUpdateFactory;
@@ -60,8 +59,12 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * A fragment that displays a Google Map and a list of nearby marinas.
- * Users can search for locations, view marinas, and mark them as favorites.
+ * A fragment that displays a Google Map and a list of nearby marinas / docks / beaches.
+ * Users can search for locations, view results, and mark them as favorites.
+ *
+ * Model:
+ *  - Place  = raw search result (marina / dock / beach)
+ *  - SpotsItem = a Place the user has favorited (saved in Firestore)
  */
 public class MapsFragment extends Fragment implements OnMapReadyCallback {
 
@@ -72,7 +75,7 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
     // Distance constants.
     private static final double METERS_IN_MILE = 1609.34;
     private static final double METERS_IN_KM = 1000.0;
-    // Default radius (10 miles) for initial
+    // Default radius (10 miles) for initial search (overridden by unit pref).
     private static final double DEFAULT_RADIUS_METERS = 10 * METERS_IN_MILE;
 
     // SharedPreferences keys (must match SettingsFragment).
@@ -85,7 +88,9 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
     private RecyclerView recyclerMarinas;
     private Spinner spinnerType;
     private Spinner spinnerDistance;
-    private List<MarinaItem> allMarinas = new ArrayList<>();
+
+    // All current search results (Places).
+    private List<Place> allPlaces = new ArrayList<>();
 
     // Current filter state.
     private String currentTypeFilter = "marinas";
@@ -102,6 +107,7 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
     private ListenerRegistration favReg;
     private Set<String> favoriteIdsLive = new HashSet<>();
 
+    // Adapter now expected to work with Place items.
     private MarinaAdapter marinaAdapter;
 
     /**
@@ -118,23 +124,14 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
                 }
             });
 
-    /**
-     * Default constructor for the fragment. Required for fragment instantiation.
-     */
     public MapsFragment() { }
 
-    /**
-     * Inflates the fragment's layout.
-     */
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
         return inflater.inflate(R.layout.fragment_maps, container, false);
     }
 
-    /**
-     * Called after the view has been created. Used to initialize UI components and listeners.
-     */
     @Override
     public void onViewCreated(@NonNull View root, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(root, savedInstanceState);
@@ -157,72 +154,75 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
         // Set initial radius according to current unit (10 km or 10 mi)
         currentRadiusMeters = useKilometers ? 10 * METERS_IN_KM : 10 * METERS_IN_MILE;
 
-        // Adapter Setup
-        // Initialize the adapter and define the favorite button click behavior
-        marinaAdapter = new MarinaAdapter((item, position) -> {
-            // Create a mutable copy of the current list from the adapter.
-            List<MarinaItem> current = new ArrayList<>(marinaAdapter.getCurrentList());
-            MarinaItem old = current.get(position);
-            boolean newFavorite = !old.isFavorite();
+        // --- Adapter Setup ---
+        // Initialize the adapter and define the favorite button click behavior.
+        marinaAdapter = new MarinaAdapter((place, position) -> {
+            if (place.getId() == null) return;
+            String placeId = place.getId();
+            String name = place.getName() != null ? place.getName() : "Spot";
 
-            // Create an updated item with the new favorite state.
-            MarinaItem updated = new MarinaItem(
-                    old.name, old.address, old.placeId, old.latLng, old.distanceMeters, newFavorite
-            );
-            // Replace the old item with the updated one and submit the new list.
-            current.set(position, updated);
-            marinaAdapter.submitList(current);
+            boolean isCurrentlyFavorite = favoriteIdsLive.contains(placeId);
+            boolean newFavorite = !isCurrentlyFavorite;
 
-            // --- Database Sync ---
             if (newFavorite) {
-                // If it's a new favorite, convert to a SpotsItem and save to the database.
-                SpotsItem spot = toSpot(updated);
-                String docId = spot.getPlaceId();
-                spotsRepo.upsertSpotById(docId, spot,
+                // --- Optimistically ADD to favorites ---
+                favoriteIdsLive.add(placeId);
+                marinaAdapter.setFavoritePlaceIds(new HashSet<>(favoriteIdsLive));
+
+                SpotsItem spot = toSpot(place);   // updated helper below
+
+                spotsRepo.upsertSpotById(placeId, spot,
                         () -> {
                             Toast.makeText(requireContext(),
-                                    "Added to favorites: " + updated.name,
+                                    "Added to favorites: " + name,
                                     Toast.LENGTH_SHORT).show();
-                            Log.d("Marinas", "Added to DB: " + updated.name);
+                            Log.d("Marinas", "Added to DB: " + name);
                         },
                         e -> {
+                            // Revert on failure
+                            favoriteIdsLive.remove(placeId);
+                            marinaAdapter.setFavoritePlaceIds(new HashSet<>(favoriteIdsLive));
                             Toast.makeText(requireContext(),
                                     "Failed to add favorite: " + e.getMessage(),
                                     Toast.LENGTH_LONG).show();
                             Log.e("Marinas", "Failed to add to DB: " + e.getMessage());
-                            updated.setFavorite(false);
-                            marinaAdapter.notifyDataSetChanged();
                         });
 
             } else {
-                // If it's no longer a favorite, remove it from the database using its unique placeId.
-                spotsRepo.deleteSpotById(updated.placeId,
+                // --- Optimistically REMOVE from favorites ---
+                favoriteIdsLive.remove(placeId);
+                marinaAdapter.setFavoritePlaceIds(new HashSet<>(favoriteIdsLive));
+
+                spotsRepo.deleteSpotById(placeId,
                         () -> {
                             Toast.makeText(requireContext(),
-                                    "Removed from favorites: " + updated.name,
+                                    "Removed from favorites: " + name,
                                     Toast.LENGTH_SHORT).show();
-                            Log.d("Marinas", "Removed from DB: " + updated.name);
+                            Log.d("Marinas", "Removed from DB: " + name);
                         },
                         e -> {
+                            // Revert on failure
+                            favoriteIdsLive.add(placeId);
+                            marinaAdapter.setFavoritePlaceIds(new HashSet<>(favoriteIdsLive));
                             Toast.makeText(requireContext(),
                                     "Failed to remove favorite: " + e.getMessage(),
                                     Toast.LENGTH_LONG).show();
-                            Log.e("Marinas", "Error removing from DB: " + updated.name, e);
-                            updated.setFavorite(true);
-                            marinaAdapter.notifyDataSetChanged();
+                            Log.e("Marinas", "Error removing from DB: " + name, e);
                         });
             }
         });
 
         // When a list item is clicked, open the detail screen.
-        marinaAdapter.setOnMarinaClickListener((item, position) -> {
+        marinaAdapter.setOnMarinaClickListener((place, position) -> {
+            if (place == null) return;
+
             Intent intent = new Intent(requireContext(), MarinaDetailActivity.class);
-            intent.putExtra(MarinaDetailActivity.EXTRA_MARINA_NAME, item.name);
-            intent.putExtra(MarinaDetailActivity.EXTRA_MARINA_ADDRESS, item.address);
-            intent.putExtra(MarinaDetailActivity.EXTRA_PLACE_ID, item.placeId);
-            if (item.latLng != null) {
-                intent.putExtra(MarinaDetailActivity.EXTRA_LAT, item.latLng.latitude);
-                intent.putExtra(MarinaDetailActivity.EXTRA_LNG, item.latLng.longitude);
+            intent.putExtra(MarinaDetailActivity.EXTRA_MARINA_NAME, place.getName());
+            intent.putExtra(MarinaDetailActivity.EXTRA_MARINA_ADDRESS, place.getAddress());
+            intent.putExtra(MarinaDetailActivity.EXTRA_PLACE_ID, place.getId());
+            if (place.getLatLng() != null) {
+                intent.putExtra(MarinaDetailActivity.EXTRA_LAT, place.getLatLng().latitude);
+                intent.putExtra(MarinaDetailActivity.EXTRA_LNG, place.getLatLng().longitude);
             }
             startActivity(intent);
         });
@@ -241,8 +241,13 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
     public void onStart() {
         super.onStart();
         favReg = spotsRepo.listenFavoriteIds(ids -> {
-            favoriteIdsLive = ids;
-            recomputeMergedAndSubmit();  // recompute using latest allMarinas + live IDs
+            // Keep a mutable copy locally
+            favoriteIdsLive = (ids != null) ? new HashSet<>(ids) : new HashSet<>();
+
+            // Let the adapter know which IDs are currently favorites
+            if (marinaAdapter != null) {
+                marinaAdapter.setFavoritePlaceIds(favoriteIdsLive);
+            }
         }, e -> {
             Log.e("Spots", "favorites listen failed", e);
             Toast.makeText(requireContext(), "Failed to listen to favorites", Toast.LENGTH_SHORT).show();
@@ -270,54 +275,46 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
         }
     }
 
+    /**
+     * Re-submit the current Place list to the adapter whenever favorites or data change.
+     * The adapter is responsible for checking favoriteIdsLive to show favorite state.
+     */
     private void recomputeMergedAndSubmit() {
-        if (allMarinas == null) return;
-
-        List<MarinaItem> merged = new ArrayList<>(allMarinas.size());
-        for (MarinaItem m : allMarinas) {
-            boolean isFavorite = favoriteIdsLive.contains(m.placeId);
-            merged.add(new MarinaItem(
-                    m.name, m.address, m.placeId, m.latLng, m.distanceMeters, isFavorite
-            ));
-        }
-        marinaAdapter.submitList(merged);
+        if (allPlaces == null) return;
+        marinaAdapter.submitList(new ArrayList<>(allPlaces));
     }
 
-    private void setMarinasAndRefresh(List<MarinaItem> loadedMarinas) {
-        // Keep an immutable copy for ListAdapter/DiffUtil correctness
-        this.allMarinas = new ArrayList<>(loadedMarinas);
-        recomputeMergedAndSubmit();  // merges with favoriteIdsLive and updates the adapter
-        updateMapMarkers();          // refresh markers for the new list
+    private void setPlacesAndRefresh(List<Place> loadedPlaces) {
+        this.allPlaces = new ArrayList<>(loadedPlaces);
+        recomputeMergedAndSubmit();
+        updateMapMarkers();
     }
 
     /**
-     * Refreshes map markers based on the currently loaded marinas.
+     * Refreshes map markers based on the currently loaded Places.
      */
     private void updateMapMarkers() {
         if (mMap == null) return;
 
-        // Clear old markers and mapping.
         mMap.clear();
         markerByPlaceId.clear();
 
-        for (int i = 0; i < allMarinas.size(); i++) {
-            MarinaItem m = allMarinas.get(i);
-            if (m.latLng == null) continue;
+        for (int i = 0; i < allPlaces.size(); i++) {
+            Place place = allPlaces.get(i);
+            if (place == null || place.getLatLng() == null) continue;
 
             Marker marker = mMap.addMarker(
                     new MarkerOptions()
-                            .position(m.latLng)
-                            .title(m.name)
-                            .snippet(m.address)
+                            .position(place.getLatLng())
+                            .title(place.getName())
+                            .snippet(place.getAddress())
             );
             if (marker != null) {
-                // Tag the marker with the list position so we can sync on click.
                 marker.setTag(i);
-                markerByPlaceId.put(m.placeId, marker);
+                markerByPlaceId.put(place.getId(), marker);
             }
         }
 
-        // When a marker is clicked, scroll/select corresponding item in the list.
         mMap.setOnMarkerClickListener(marker -> {
             Object tag = marker.getTag();
             if (tag instanceof Integer) {
@@ -326,28 +323,25 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
                     recyclerMarinas.smoothScrollToPosition(position);
                 }
             }
-            // Return false to also show the default info window.
             return false;
         });
     }
 
     /**
-     * Converts a MarinaItem to a SpotsItem for database storage.
-     *
-     * @param m The MarinaItem to convert.
-     * @return A corresponding SpotsItem.
+     * Converts a Place result into a SpotsItem for database storage.
      */
-    private SpotsItem toSpot(@NonNull MarinaItem m) {
+    private SpotsItem toSpot(@NonNull Place place) {
         SpotsItem spot = new SpotsItem();
-        spot.setName(m.name);
-        spot.setPlaceId(m.placeId);
-        spot.setAddress(m.address);
+        spot.setName(place.getName());
+        spot.setPlaceId(place.getId());
+        spot.setAddress(place.getAddress());
         spot.setType(SpotsItem.Type.MARINA);
-        if (m.latLng != null) {
-            spot.setLatitude(m.latLng.latitude);
-            spot.setLongitude(m.latLng.longitude);
+
+        if (place.getLatLng() != null) {
+            spot.setLatitude(place.getLatLng().latitude);
+            spot.setLongitude(place.getLatLng().longitude);
         }
-        spot.setFavorite(true); // Assumes this is called when an item becomes a favorite.
+        spot.setFavorite(true);
         return spot;
     }
 
@@ -356,7 +350,6 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
      */
     private void initializePlacesClient() {
         if (!Places.isInitialized()) {
-            // Use API key from resources.
             String apiKey = getString(R.string.google_maps_key);
             Places.initialize(requireContext().getApplicationContext(), apiKey);
         }
@@ -368,7 +361,6 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
      */
     private void setupFilterSpinners() {
         if (spinnerType != null) {
-            // Simple inline list for types
             List<String> types = Arrays.asList("Marinas", "Docks", "Beaches");
             ArrayAdapter<String> typeAdapter = new ArrayAdapter<>(
                     requireContext(),
@@ -383,7 +375,6 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
                 @Override
                 public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                     currentTypeFilter = (String) parent.getItemAtPosition(position);
-                    // Re-run the search at the current map center.
                     if (mMap != null) {
                         LatLng center = mMap.getCameraPosition().target;
                         searchForMarinas(center, currentRadiusMeters, currentTypeFilter);
@@ -396,7 +387,6 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
         }
 
         if (spinnerDistance != null) {
-            // Distance options depending on unit preference.
             List<String> distances;
             if (useKilometers) {
                 distances = Arrays.asList("10 km", "20 km", "30 km");
@@ -411,13 +401,12 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
             );
             distanceAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
             spinnerDistance.setAdapter(distanceAdapter);
-            spinnerDistance.setSelection(0); // default "10"
+            spinnerDistance.setSelection(0);
 
             spinnerDistance.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
                 @Override
                 public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                     String label = (String) parent.getItemAtPosition(position);
-                    // Extract numeric part (e.g., "10" from "10 km" / "10 mi").
                     int valueKmOrMi;
                     try {
                         valueKmOrMi = Integer.parseInt(label.split(" ")[0]);
@@ -425,14 +414,12 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
                         valueKmOrMi = 10;
                     }
 
-                    // Update radius in meters based on unit.
                     if (useKilometers) {
                         currentRadiusMeters = valueKmOrMi * METERS_IN_KM;
                     } else {
                         currentRadiusMeters = valueKmOrMi * METERS_IN_MILE;
                     }
 
-                    // Re-run the search at the current map center.
                     if (mMap != null) {
                         LatLng center = mMap.getCameraPosition().target;
                         searchForMarinas(center, currentRadiusMeters, currentTypeFilter);
@@ -449,7 +436,6 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
      * Initializes and adds the Google Map fragment to the layout.
      */
     private void setupMapFragment(Bundle savedInstanceState) {
-        // Only add the fragment if the activity is not being recreated.
         if (savedInstanceState == null) {
             SupportMapFragment mapFragment = new SupportMapFragment();
             getChildFragmentManager().beginTransaction()
@@ -457,7 +443,6 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
                     .commit();
         }
 
-        // Wait for transactions to complete and then get the map asynchronously.
         getChildFragmentManager().executePendingTransactions();
         SupportMapFragment mapFrag =
                 (SupportMapFragment) getChildFragmentManager().findFragmentByTag(TAG_MAP);
@@ -474,9 +459,6 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
         searchView.setQueryHint("Search for a location…");
 
         searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
-            /**
-             * Called when the user submits a search query.
-             */
             @Override
             public boolean onQueryTextSubmit(String query) {
                 final String locationName = query.trim();
@@ -484,35 +466,32 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
                     Toast.makeText(requireContext(), "Please enter a location.", Toast.LENGTH_SHORT).show();
                     return true;
                 }
-                // Use Geocoder to find coordinates for the entered location name.
                 try {
                     Geocoder geocoder = new Geocoder(requireContext(), Locale.getDefault());
-                    // Get the first result from the geocoder.
                     List<Address> addressList = geocoder.getFromLocationName(locationName, 1);
                     if (addressList != null && !addressList.isEmpty()) {
                         Address address = addressList.get(0);
                         LatLng latLng = new LatLng(address.getLatitude(), address.getLongitude());
-                        // Move the map camera to the found location.
                         if (mMap != null) {
                             mMap.clear();
                             markerByPlaceId.clear();
                             mMap.addMarker(new MarkerOptions().position(latLng).title(locationName));
                             animateCamera(latLng, 12f);
-                            // Also search for places around the new location using current filters.
                             searchForMarinas(latLng, currentRadiusMeters, currentTypeFilter);
                         }
                     } else {
-                        Toast.makeText(requireContext(), "No results for \"" + locationName + "\"", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(requireContext(),
+                                "No results for \"" + locationName + "\"",
+                                Toast.LENGTH_SHORT).show();
                     }
                 } catch (IOException e) {
-                    Toast.makeText(requireContext(), "Geocoder error. Check network.", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(requireContext(),
+                            "Geocoder error. Check network.",
+                            Toast.LENGTH_SHORT).show();
                 }
                 return true;
             }
 
-            /**
-             * Called when the text in the search view changes. Not used here.
-             */
             @Override
             public boolean onQueryTextChange(String newText) {
                 return false;
@@ -520,54 +499,34 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
         });
     }
 
-    /**
-     * Callback for when the Google Map is ready to be used.
-     */
     @Override
     public void onMapReady(@NonNull GoogleMap googleMap) {
         mMap = googleMap;
-        // Set initial camera position (e.g., Miami, Florida).
+        // Initial camera position (e.g., Miami).
         LatLng miami = new LatLng(25.7617, -80.1918);
         mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(miami, 11f));
 
-        // Perform initial search with current filters.
+        // Initial search with current filters.
         searchForMarinas(miami, currentRadiusMeters, currentTypeFilter);
 
-        // Configure map UI settings.
         mMap.getUiSettings().setZoomControlsEnabled(true);
         mMap.getUiSettings().setMyLocationButtonEnabled(true);
 
-        // Attempt to enable the 'My Location' blue dot and button.
         enableMyLocation();
     }
 
-    /**
-     * Checks for location permission and enables the 'My Location' layer if granted.
-     * If not granted, it launches the permission request.
-     */
     private void enableMyLocation() {
         if (mMap == null || getContext() == null) return;
-        // Check if the app has the required location permission.
         if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_FINE_LOCATION)
                 == PackageManager.PERMISSION_GRANTED) {
             try {
-                // Permission is granted, so enable the location layer.
                 mMap.setMyLocationEnabled(true);
-            } catch (SecurityException ignored) {
-                // This should not happen if the permission check passes.
-            }
+            } catch (SecurityException ignored) { }
         } else {
-            // Permission is not granted, so request it.
             requestFineLocation.launch(Manifest.permission.ACCESS_FINE_LOCATION);
         }
     }
 
-    /**
-     * Animates the map camera to a new position with a specified zoom level.
-     *
-     * @param latLng The target coordinates.
-     * @param zoom   The target zoom level.
-     */
     private void animateCamera(LatLng latLng, float zoom) {
         if (mMap == null) return;
         CameraPosition pos = new CameraPosition.Builder()
@@ -575,12 +534,6 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
         mMap.animateCamera(CameraUpdateFactory.newCameraPosition(pos));
     }
 
-    /**
-     * Returns the list of primary place types for the current filter.
-     * Uses Places primary types, then we further refine by name/address.
-     *
-     * @param filterType The user-friendly filter string (e.g., "Marinas").
-     */
     @NonNull
     private List<String> getPrimaryTypesForFilter(@NonNull String filterType) {
         String lower = filterType.toLowerCase(Locale.US);
@@ -591,17 +544,12 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
         return Arrays.asList("marina");
     }
 
-    /**
-     * Applies simple name/address heuristics to ensure the place matches the
-     * selected filter type (marinas, docks, beaches).
-     */
     private boolean matchesTypeFilter(@NonNull Place place, @NonNull String filterType) {
         String lowerFilter = filterType.toLowerCase(Locale.US);
         String name = place.getName() != null ? place.getName().toLowerCase(Locale.US) : "";
         String addr = place.getAddress() != null ? place.getAddress().toLowerCase(Locale.US) : "";
 
         if ("marinas".equals(lowerFilter)) {
-            // Marinas / yacht clubs.
             return name.contains("marina")
                     || name.contains("yacht")
                     || name.contains("harbor")
@@ -611,7 +559,6 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
                     || addr.contains("harbor")
                     || addr.contains("harbour");
         } else if ("docks".equals(lowerFilter)) {
-            // Boating docks / landings
             return name.contains("dock")
                     || name.contains("pier")
                     || name.contains("landing")
@@ -621,22 +568,16 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
                     || addr.contains("landing")
                     || addr.contains("boat ramp");
         } else if ("beaches".equals(lowerFilter)) {
-            // Beaches
             return name.contains("beach") || addr.contains("beach");
         }
         return true;
     }
 
     /**
-     * Searches for marinas/docks/beaches near a given map location within a specified radius
-     * using the Places SDK Search Nearby API.
-     *
-     * @param centerLatLng   The latitude and longitude of the search center.
-     * @param radiusInMeters The search radius in meters.
-     * @param filterType     The current type filter (e.g., "Marinas", "Docks", "Beaches").
+     * Searches for marinas/docks/beaches near a given map location within a specified radius.
+     * Returns Places, and favorites are tracked separately via favoriteIdsLive.
      */
     private void searchForMarinas(@NonNull LatLng centerLatLng, double radiusInMeters, @NonNull String filterType) {
-        // Define the fields you want the API to return for each place.
         List<Place.Field> placeFields = Arrays.asList(
                 Place.Field.ID,
                 Place.Field.NAME,
@@ -644,54 +585,35 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
                 Place.Field.ADDRESS
         );
 
-        // Build a circular location restriction with the given radius.
         CircularBounds locationRestriction = CircularBounds.newInstance(centerLatLng, radiusInMeters);
 
-        // Resolve which primary types to include based on the filter.
         List<String> primaryTypes = getPrimaryTypesForFilter(filterType);
 
-        // Build the SearchNearbyRequest to include the selected primary types.
         SearchNearbyRequest request = SearchNearbyRequest.builder(locationRestriction, placeFields)
                 .setIncludedPrimaryTypes(primaryTypes)
                 .build();
 
-        // Execute the request with the Places client.
         placesClient.searchNearby(request).addOnSuccessListener(response -> {
-            List<MarinaItem> foundMarinas = new ArrayList<>();
+            List<Place> foundPlaces = new ArrayList<>();
 
             for (Place place : response.getPlaces()) {
                 if (place.getLatLng() == null || place.getName() == null || place.getId() == null)
                     continue;
 
-                // Extra filtering by type based on name/address.
                 if (!matchesTypeFilter(place, filterType)) continue;
 
-                // Compute distance from the search center in either miles or kilometers.
+                // Distance is computed if needed by UI; not stored in model here.
                 float[] results = new float[1];
-                Location.distanceBetween(centerLatLng.latitude, centerLatLng.longitude,
-                        place.getLatLng().latitude, place.getLatLng().longitude, results);
+                Location.distanceBetween(
+                        centerLatLng.latitude, centerLatLng.longitude,
+                        place.getLatLng().latitude, place.getLatLng().longitude,
+                        results
+                );
 
-                double distance;
-                if (useKilometers) {
-                    distance = results[0] / METERS_IN_KM;
-                } else {
-                    distance = results[0] / METERS_IN_MILE;
-                }
-
-                boolean isFavorite = favoriteIdsLive.contains(place.getId());
-
-                // NOTE: distanceMiles now stores distance in *current units* (mi or km).
-                foundMarinas.add(new MarinaItem(
-                        place.getName(),
-                        place.getAddress(),
-                        place.getId(),
-                        place.getLatLng(),
-                        distance,
-                        isFavorite
-                ));
+                foundPlaces.add(place);
             }
-            Log.d(TAG, "Found " + foundMarinas.size() + " places for filter=" + filterType);
-            setMarinasAndRefresh(foundMarinas);
+            Log.d(TAG, "Found " + foundPlaces.size() + " places for filter=" + filterType);
+            setPlacesAndRefresh(foundPlaces);
 
         }).addOnFailureListener(e -> {
             Log.e(TAG, "Error searching for marinas", e);
