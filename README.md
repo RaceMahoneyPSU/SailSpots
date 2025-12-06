@@ -77,7 +77,7 @@ This project is built using a combination of modern Android libraries and Google
 
  Login Screen | Marina List + Map | Marina Detail (with Weather) | Add Review Dialog |
 | :---: | :---: | :---: | :---: |
-| ![alt text](sceenshots/image.png) | ![alt text](sceenshots/image-1.png) | ![alt text](sceenshots/image-2.png) | ![alt text](sceenshots/image-3.png) |
+| ![alt text](screenshots/image.png) | ![alt text](screenshots/image-1.png) | ![alt text](screenshots/image-2.png) | ![alt text](screenshots/image-3.png) |
 
 ---
 
