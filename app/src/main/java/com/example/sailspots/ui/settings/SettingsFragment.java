@@ -43,12 +43,31 @@ public class SettingsFragment extends Fragment {
     // --- Data Components ---
     private SharedPreferences prefs;
 
+    /**
+     * Inflates the settings layout that contains unit preferences and password fields.
+     *
+     * @param inflater  The LayoutInflater object that can be used to inflate views.
+     * @param container The parent view that the fragment's UI should be attached to.
+     * @param savedInstanceState If non-null, this fragment is being re-constructed
+     *                           from a previous saved state.
+     * @return The root view for this fragment's UI.
+     */
     @Nullable
     @Override
-    public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
+    public View onCreateView(@NonNull LayoutInflater inflater,
+                             @Nullable ViewGroup container,
+                             @Nullable Bundle savedInstanceState) {
         return inflater.inflate(R.layout.fragment_settings, container, false);
     }
 
+    /**
+     * Called immediately after the view hierarchy has been created.
+     * Initializes UI references, loads stored preferences, and wires up listeners
+     * for the units switch and password update button.
+     *
+     * @param view               The fragment's root view.
+     * @param savedInstanceState Saved state if the fragment is being re-created, null otherwise.
+     */
     @Override
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
@@ -80,6 +99,9 @@ public class SettingsFragment extends Fragment {
     /**
      * Re-authenticates the user with their current password before allowing sensitive actions.
      * Runs the onSuccess runnable if authentication passes.
+     *
+     * @param currentPassword The user's current password.
+     * @param onSuccess       A callback to execute if re-authentication succeeds.
      */
     private void reauthenticateThen(@NonNull String currentPassword, @NonNull Runnable onSuccess) {
         FirebaseUser user = FirebaseAuth.getInstance().getCurrentUser();
@@ -109,6 +131,7 @@ public class SettingsFragment extends Fragment {
 
     /**
      * Validates input fields and updates the user's password in Firebase.
+     * Requires the current password for re-authentication before applying the change.
      */
     private void updatePassword() {
         String newPass = etNewPassword.getText() != null
