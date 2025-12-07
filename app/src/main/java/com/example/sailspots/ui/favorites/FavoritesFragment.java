@@ -51,12 +51,29 @@ public class FavoritesFragment extends Fragment {
     private SpotsRepository spotsRepo;
     private ListenerRegistration favoritesListener;
 
+    /**
+     * Inflates the layout for the favorites screen, which contains
+     * a RecyclerView, empty state text, and a loading indicator.
+     *
+     * @param inflater           The LayoutInflater used to inflate views.
+     * @param container          The parent view that this fragment's UI will be attached to.
+     * @param savedInstanceState If non-null, this fragment is being re-constructed
+     *                           from a previous saved state.
+     * @return The root View of the inflated layout.
+     */
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater,
                              ViewGroup container, Bundle savedInstanceState) {
         return inflater.inflate(R.layout.fragment_favorites, container, false);
     }
 
+    /**
+     * Called after the fragment's view has been created.
+     * Initializes view references, the repository, and sets up the RecyclerView adapter.
+     *
+     * @param root               The fragment's root view.
+     * @param savedInstanceState Saved state if the fragment is being re-created, null otherwise.
+     */
     @Override
     public void onViewCreated(@NonNull View root, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(root, savedInstanceState);
@@ -73,6 +90,10 @@ public class FavoritesFragment extends Fragment {
         setupRecyclerView();
     }
 
+    /**
+     * Called when the fragment becomes visible to the user.
+     * Starts listening for favorite changes and loads the latest data.
+     */
     @Override
     public void onStart() {
         super.onStart();
@@ -80,6 +101,10 @@ public class FavoritesFragment extends Fragment {
         loadFavorites();
     }
 
+    /**
+     * Called when the fragment is no longer visible.
+     * Cleans up any Firestore listeners to avoid memory leaks.
+     */
     @Override
     public void onStop() {
         super.onStop();
@@ -120,6 +145,9 @@ public class FavoritesFragment extends Fragment {
     /**
      * Logic for clicking the heart icon on this screen.
      * Removes the item from the database immediately.
+     *
+     * @param place    The Place associated with the favorite entry.
+     * @param position The adapter position of the clicked item.
      */
     private void removeFavorite(@NonNull Place place, int position) {
         String id = place.getId();
@@ -163,6 +191,8 @@ public class FavoritesFragment extends Fragment {
     /**
      * Iterates through a set of IDs, fetching the full SpotsItem object for each.
      * Converts results to Place objects and updates the UI once all are loaded.
+     *
+     * @param ids The set of favorite place IDs to resolve to full objects.
      */
     private void fetchDetailsForIds(Set<String> ids) {
         List<Place> loadedPlaces = new ArrayList<>();
@@ -185,7 +215,11 @@ public class FavoritesFragment extends Fragment {
     }
 
     /**
-     * Checks if the asynchronous loading of all items is complete.
+     * Checks if the asynchronous loading of all items is complete and updates the UI accordingly.
+     *
+     * @param currentCount The number of items that have finished loading.
+     * @param total        The total number of items expected to load.
+     * @param places       The list of successfully loaded Place objects.
      */
     private void checkLoadComplete(int currentCount, int total, List<Place> places) {
         if (currentCount == total) {
@@ -195,7 +229,9 @@ public class FavoritesFragment extends Fragment {
     }
 
     /**
-     * Updates the list visibility based on whether items exist.
+     * Updates the list visibility and adapter contents based on whether items exist.
+     *
+     * @param places The list of favorite Place objects to display.
      */
     private void updateUI(List<Place> places) {
         if (places.isEmpty()) {
@@ -211,6 +247,9 @@ public class FavoritesFragment extends Fragment {
 
     /**
      * Converts a stored SpotsItem (database model) into a Place object (UI model).
+     *
+     * @param spot The database representation of the user's saved spot.
+     * @return A Place instance suitable for display in the UI.
      */
     private Place toPlace(SpotsItem spot) {
         LatLng latLng = (spot.getLatitude() != 0 && spot.getLongitude() != 0)
@@ -231,6 +270,8 @@ public class FavoritesFragment extends Fragment {
 
     /**
      * Toggles the visibility of the progress bar and main content.
+     *
+     * @param isLoading True to show the loading indicator and hide content; false to hide it.
      */
     private void showLoading(boolean isLoading) {
         if (progressBar != null) {

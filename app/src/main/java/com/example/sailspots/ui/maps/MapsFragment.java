@@ -116,14 +116,24 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
                 }
             });
 
+    /**
+     * Default constructor required for fragment instantiation.
+     */
     public MapsFragment() { }
 
+    /**
+     * Inflates the fragment's layout containing the map, filters, and results list.
+     */
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
         return inflater.inflate(R.layout.fragment_maps, container, false);
     }
 
+    /**
+     * Called after the view hierarchy has been created.
+     * Initializes UI elements, shared prefs, adapters, and map/search setup.
+     */
     @Override
     public void onViewCreated(@NonNull View root, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(root, savedInstanceState);
@@ -181,6 +191,9 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
         setupSearchView();
     }
 
+    /**
+     * Starts listening for favorite ID changes when the fragment becomes visible.
+     */
     @Override
     public void onStart() {
         super.onStart();
@@ -195,6 +208,9 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
         });
     }
 
+    /**
+     * Stops listening for favorite ID changes when the fragment is no longer visible.
+     */
     @Override
     public void onStop() {
         super.onStop();
@@ -204,6 +220,9 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
         }
     }
 
+    /**
+     * Public hook that can be called before sign-out to ensure Firestore listeners are cleaned up.
+     */
     public void onSignOut() {
         Log.d(TAG, "onSignOut called, removing listener.");
         if (favReg != null) {
@@ -212,6 +231,13 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
         }
     }
 
+    /**
+     * Handles toggling a Place as a favorite when the heart icon is clicked.
+     * Performs optimistic UI updates and syncs the change with Firestore.
+     *
+     * @param place    The Place associated with the clicked item.
+     * @param position The adapter position in the list.
+     */
     private void toggleFavorite(@NonNull Place place, int position) {
         if (place.getId() == null) return;
         String placeId = place.getId();
@@ -261,7 +287,8 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
     }
 
     /**
-     * Filter allPlaces by currentRadiusMeters around currentCenter and push to the UI.
+     * Filters allPlaces by the currently selected radius around currentCenter,
+     * then updates the list and map markers.
      */
     private void applyRadiusFilterAndRefresh() {
         if (currentCenter == null || allPlaces == null) {
@@ -289,7 +316,10 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
     }
 
     /**
-     * Clears existing markers and adds new ones for the supplied Places.
+     * Clears existing markers and adds new ones for the supplied Places list.
+     * Also configures marker click behavior to scroll the list.
+     *
+     * @param placesToShow The list of Places to visualize as markers.
      */
     private void updateMapMarkers(List<Place> placesToShow) {
         if (mMap == null) return;
@@ -325,6 +355,12 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
         });
     }
 
+    /**
+     * Converts a Places API Place into a SpotsItem suitable for Firestore storage.
+     *
+     * @param place The Place to convert.
+     * @return A corresponding SpotsItem with location, type, and favorite flag set.
+     */
     private SpotsItem toSpot(@NonNull Place place) {
         SpotsItem spot = new SpotsItem();
         spot.setName(place.getName());
@@ -340,6 +376,9 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
         return spot;
     }
 
+    /**
+     * Initializes the Google Places API client if needed and creates a PlacesClient instance.
+     */
     private void initializePlacesClient() {
         if (!Places.isInitialized()) {
             String apiKey = getString(R.string.google_maps_key);
@@ -348,6 +387,10 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
         placesClient = Places.createClient(requireContext());
     }
 
+    /**
+     * Sets up the type and distance spinners, including their adapters and selection listeners.
+     * Type changes trigger a new Places fetch; distance changes re-filter the in-memory results.
+     */
     private void setupFilterSpinners() {
         if (spinnerType != null) {
             List<String> types = Arrays.asList("Marinas", "Docks", "Beaches");
@@ -419,6 +462,9 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
         }
     }
 
+    /**
+     * Creates and attaches the child SupportMapFragment and registers for the map async callback.
+     */
     private void setupMapFragment(Bundle savedInstanceState) {
         if (savedInstanceState == null) {
             SupportMapFragment mapFragment = new SupportMapFragment();
@@ -435,6 +481,10 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
         }
     }
 
+    /**
+     * Configures the SearchView so users can search arbitrary locations by name
+     * and run a Places search centered on the result.
+     */
     private void setupSearchView() {
         if (searchView == null) return;
         searchView.setQueryHint("Search for a location…");
@@ -478,6 +528,10 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
         });
     }
 
+    /**
+     * Called when the GoogleMap instance is ready.
+     * Sets an initial camera position and kicks off the first Places search.
+     */
     @Override
     public void onMapReady(@NonNull GoogleMap googleMap) {
         mMap = googleMap;
@@ -495,6 +549,10 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
         enableMyLocation();
     }
 
+    /**
+     * Enables the "My Location" blue dot and button if the location permission is granted.
+     * Otherwise, it requests the necessary permission.
+     */
     private void enableMyLocation() {
         if (mMap == null || getContext() == null) return;
         if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_FINE_LOCATION)
@@ -507,6 +565,12 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
         }
     }
 
+    /**
+     * Animates the camera to the specified LatLng with the given zoom level.
+     *
+     * @param latLng The target location on the map.
+     * @param zoom   The desired zoom level.
+     */
     private void animateCamera(LatLng latLng, float zoom) {
         if (mMap == null) return;
         CameraPosition pos = new CameraPosition.Builder()
@@ -514,6 +578,12 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
         mMap.animateCamera(CameraUpdateFactory.newCameraPosition(pos));
     }
 
+    /**
+     * Returns the primary Place types to use for a given user-facing filter label.
+     *
+     * @param filterType The selected filter ("Marinas", "Docks", "Beaches").
+     * @return A list of Places API primary type strings.
+     */
     @NonNull
     private List<String> getPrimaryTypesForFilter(@NonNull String filterType) {
         String lower = filterType.toLowerCase(Locale.US);
@@ -524,6 +594,13 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
         return Arrays.asList("marina");
     }
 
+    /**
+     * Applies additional name/address-based filtering for a Place to match the selected type.
+     *
+     * @param place      The Place to check.
+     * @param filterType The user-facing filter string.
+     * @return true if the Place matches the filter; false otherwise.
+     */
     private boolean matchesTypeFilter(@NonNull Place place, @NonNull String filterType) {
         String lowerFilter = filterType.toLowerCase(Locale.US);
         String name = place.getName() != null ? place.getName().toLowerCase(Locale.US) : "";
@@ -542,8 +619,12 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
     }
 
     /**
-     * Fetches places within *maxSearchRadiusMeters* and stores them in allPlaces,
-     * then applies the currentRadiusMeters filter for display.
+     * Fetches places within {@code maxSearchRadiusMeters} from the Places API,
+     * stores them in {@code allPlaces}, and then applies the current radius filter for display.
+     *
+     * @param centerLatLng        The center of the search area.
+     * @param radiusInMetersIgnored Ignored; the method always uses maxSearchRadiusMeters.
+     * @param filterType          The current type filter ("Marinas", "Docks", "Beaches").
      */
     private void searchForMarinas(@NonNull LatLng centerLatLng,
                                   double radiusInMetersIgnored,
