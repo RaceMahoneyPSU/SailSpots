@@ -50,7 +50,7 @@ This project demonstrates proficiency in fundamental Android development concept
 ### Feature 4: Interactive Map View with Search & Filtering
 -   **Google Maps Integration:** Leverages the native Google Maps SDK for a familiar and fluid user experience, including smooth panning, zooming, and location tracking.
 -   **Dynamic Search:** Users can search for any city, region, or point of interest using an integrated search bar. The map automatically moves to the specified location.
--   **Proximity-Based Filtering:** The app allows users to filter the displayed spots based on their distance from the current map center, with predefined options (e.g., within 10 miles, 25 miles, etc.).
+-   **Proximity-Based Filtering:** The app allows users to filter the displayed spots based on their distance from the current map center, with predefined options (e.g., within 10 km, 20 km, etc.).
 -   **Type-Based Filtering:** Users can further refine their search by filtering for specific types of spots (e.g., "marina," "boat ramp," etc.), making it easy to find exactly what they need.
 -   **Interactive Markers:** Each discovered spot is represented by a pin on the map. Tapping a pin reveals an info window with the spot's name and address, providing a direct link to the detailed view.
 
