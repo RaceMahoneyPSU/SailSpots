@@ -68,15 +68,12 @@ import java.util.Set;
  */
 public class MapsFragment extends Fragment implements OnMapReadyCallback {
 
-    // Tag for identifying the map fragment in the fragment manager.
     private static final String TAG_MAP = "mapFrag";
     private static final String TAG = "MapsFragment";
 
     // Distance constants.
     private static final double METERS_IN_MILE = 1609.34;
     private static final double METERS_IN_KM = 1000.0;
-    // Default radius (10 miles) for initial search.
-    private static final double DEFAULT_RADIUS_METERS = 10 * METERS_IN_MILE;
 
     // SharedPreferences keys.
     private static final String PREFS_NAME = "SailSpotsPrefs";
@@ -89,13 +86,15 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
     private Spinner spinnerType;
     private Spinner spinnerDistance;
 
-    // All current search results.
+    // All results within the max radius (30 mi / 50 km)
     private List<Place> allPlaces = new ArrayList<>();
 
-    // Current filter state.
+    // Current state.
     private String currentTypeFilter = "marinas";
-    private double currentRadiusMeters = DEFAULT_RADIUS_METERS;
+    private double currentRadiusMeters;
+    private double maxSearchRadiusMeters;
     private boolean useKilometers = false;
+    private LatLng currentCenter = null;
 
     // Mapping from placeId to marker for map synchronization.
     private final Map<String, Marker> markerByPlaceId = new HashMap<>();
@@ -108,9 +107,6 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
 
     private MarinaAdapter marinaAdapter;
 
-    /**
-     * Handles the result of the location permission request.
-     */
     private final ActivityResultLauncher<String> requestFineLocation =
             registerForActivityResult(new ActivityResultContracts.RequestPermission(), isGranted -> {
                 if (isGranted) {
@@ -147,7 +143,17 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
         // Load unit preference from settings
         SharedPreferences prefs = requireContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
         useKilometers = prefs.getBoolean(KEY_USE_KM, false);
-        currentRadiusMeters = useKilometers ? 10 * METERS_IN_KM : 10 * METERS_IN_MILE;
+
+        // Default radius & max radius based on unit.
+        if (useKilometers) {
+            // Spinner: 15, 30, 50 km
+            currentRadiusMeters = 15 * METERS_IN_KM;
+            maxSearchRadiusMeters = 50 * METERS_IN_KM;
+        } else {
+            // Spinner: 10, 20, 30 mi
+            currentRadiusMeters = 10 * METERS_IN_MILE;
+            maxSearchRadiusMeters = 30 * METERS_IN_MILE;
+        }
 
         // --- Adapter Setup ---
         marinaAdapter = new MarinaAdapter(this::toggleFavorite);
@@ -198,10 +204,6 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
         }
     }
 
-    /**
-     * Public method to be called by MainActivity before signing out.
-     * Ensures the listener is detached before auth state changes.
-     */
     public void onSignOut() {
         Log.d(TAG, "onSignOut called, removing listener.");
         if (favReg != null) {
@@ -210,10 +212,6 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
         }
     }
 
-    /**
-     * Handles clicking the favorite heart icon on a list item.
-     * Updates the UI optimistically and syncs with the repository.
-     */
     private void toggleFavorite(@NonNull Place place, int position) {
         if (place.getId() == null) return;
         String placeId = place.getId();
@@ -223,7 +221,6 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
         boolean newFavorite = !isCurrentlyFavorite;
 
         if (newFavorite) {
-            // Optimistically ADD to favorites
             favoriteIdsLive.add(placeId);
             marinaAdapter.setFavoritePlaceIds(new HashSet<>(favoriteIdsLive));
 
@@ -234,13 +231,11 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
                         Log.d(TAG, "Added to DB: " + name);
                     },
                     e -> {
-                        // Revert on failure
                         favoriteIdsLive.remove(placeId);
                         marinaAdapter.setFavoritePlaceIds(new HashSet<>(favoriteIdsLive));
                         Toast.makeText(requireContext(), "Failed to add favorite", Toast.LENGTH_SHORT).show();
                     });
         } else {
-            // Optimistically REMOVE from favorites
             favoriteIdsLive.remove(placeId);
             marinaAdapter.setFavoritePlaceIds(new HashSet<>(favoriteIdsLive));
 
@@ -250,7 +245,6 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
                         Log.d(TAG, "Removed from DB: " + name);
                     },
                     e -> {
-                        // Revert on failure
                         favoriteIdsLive.add(placeId);
                         marinaAdapter.setFavoritePlaceIds(new HashSet<>(favoriteIdsLive));
                         Toast.makeText(requireContext(), "Failed to remove favorite", Toast.LENGTH_SHORT).show();
@@ -259,33 +253,52 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
     }
 
     /**
-     * Re-submits the current Place list to the adapter.
+     * Submit a list of Places to the adapter and refresh markers.
      */
-    private void recomputeMergedAndSubmit() {
-        if (allPlaces == null) return;
-        marinaAdapter.submitList(new ArrayList<>(allPlaces));
+    private void setPlacesAndRefresh(List<Place> displayPlaces) {
+        marinaAdapter.submitList(new ArrayList<>(displayPlaces));
+        updateMapMarkers(displayPlaces);
     }
 
     /**
-     * Updates the local list of places, refreshes the list adapter, and updates map markers.
+     * Filter allPlaces by currentRadiusMeters around currentCenter and push to the UI.
      */
-    private void setPlacesAndRefresh(List<Place> loadedPlaces) {
-        this.allPlaces = new ArrayList<>(loadedPlaces);
-        recomputeMergedAndSubmit();
-        updateMapMarkers();
+    private void applyRadiusFilterAndRefresh() {
+        if (currentCenter == null || allPlaces == null) {
+            setPlacesAndRefresh(new ArrayList<>());
+            return;
+        }
+
+        List<Place> filtered = new ArrayList<>();
+        for (Place place : allPlaces) {
+            if (place == null || place.getLatLng() == null) continue;
+
+            float[] results = new float[1];
+            Location.distanceBetween(
+                    currentCenter.latitude, currentCenter.longitude,
+                    place.getLatLng().latitude, place.getLatLng().longitude,
+                    results
+            );
+            double distanceMeters = results[0];
+            if (distanceMeters <= currentRadiusMeters) {
+                filtered.add(place);
+            }
+        }
+
+        setPlacesAndRefresh(filtered);
     }
 
     /**
-     * Clears existing markers and adds new ones based on the currently loaded Places.
+     * Clears existing markers and adds new ones for the supplied Places.
      */
-    private void updateMapMarkers() {
+    private void updateMapMarkers(List<Place> placesToShow) {
         if (mMap == null) return;
 
         mMap.clear();
         markerByPlaceId.clear();
 
-        for (int i = 0; i < allPlaces.size(); i++) {
-            Place place = allPlaces.get(i);
+        for (int i = 0; i < placesToShow.size(); i++) {
+            Place place = placesToShow.get(i);
             if (place == null || place.getLatLng() == null) continue;
 
             Marker marker = mMap.addMarker(
@@ -312,9 +325,6 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
         });
     }
 
-    /**
-     * Converts a Place result into a SpotsItem for database storage.
-     */
     private SpotsItem toSpot(@NonNull Place place) {
         SpotsItem spot = new SpotsItem();
         spot.setName(place.getName());
@@ -330,9 +340,6 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
         return spot;
     }
 
-    /**
-     * Initializes the Google Places API client.
-     */
     private void initializePlacesClient() {
         if (!Places.isInitialized()) {
             String apiKey = getString(R.string.google_maps_key);
@@ -341,9 +348,6 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
         placesClient = Places.createClient(requireContext());
     }
 
-    /**
-     * Sets up the type and distance filter spinners.
-     */
     private void setupFilterSpinners() {
         if (spinnerType != null) {
             List<String> types = Arrays.asList("Marinas", "Docks", "Beaches");
@@ -360,9 +364,8 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
                 @Override
                 public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                     currentTypeFilter = (String) parent.getItemAtPosition(position);
-                    if (mMap != null) {
-                        LatLng center = mMap.getCameraPosition().target;
-                        searchForMarinas(center, currentRadiusMeters, currentTypeFilter);
+                    if (mMap != null && currentCenter != null) {
+                        searchForMarinas(currentCenter, maxSearchRadiusMeters, currentTypeFilter);
                     }
                 }
 
@@ -374,7 +377,7 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
         if (spinnerDistance != null) {
             List<String> distances;
             if (useKilometers) {
-                distances = Arrays.asList("10 km", "20 km", "30 km");
+                distances = Arrays.asList("15 km", "30 km", "50 km");
             } else {
                 distances = Arrays.asList("10 mi", "20 mi", "30 mi");
             }
@@ -396,7 +399,8 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
                     try {
                         valueKmOrMi = Integer.parseInt(label.split(" ")[0]);
                     } catch (Exception e) {
-                        valueKmOrMi = 10;
+                        // Fallback to smallest radius if parsing fails
+                        valueKmOrMi = useKilometers ? 15 : 10;
                     }
 
                     if (useKilometers) {
@@ -405,10 +409,8 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
                         currentRadiusMeters = valueKmOrMi * METERS_IN_MILE;
                     }
 
-                    if (mMap != null) {
-                        LatLng center = mMap.getCameraPosition().target;
-                        searchForMarinas(center, currentRadiusMeters, currentTypeFilter);
-                    }
+                    // Just re-filter locally; don't hit the API again.
+                    applyRadiusFilterAndRefresh();
                 }
 
                 @Override
@@ -417,9 +419,6 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
         }
     }
 
-    /**
-     * Initializes and adds the Google Map fragment to the layout.
-     */
     private void setupMapFragment(Bundle savedInstanceState) {
         if (savedInstanceState == null) {
             SupportMapFragment mapFragment = new SupportMapFragment();
@@ -436,9 +435,6 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
         }
     }
 
-    /**
-     * Sets up the SearchView to handle user search queries.
-     */
     private void setupSearchView() {
         if (searchView == null) return;
         searchView.setQueryHint("Search for a location…");
@@ -458,11 +454,13 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
                         Address address = addressList.get(0);
                         LatLng latLng = new LatLng(address.getLatitude(), address.getLongitude());
                         if (mMap != null) {
+                            currentCenter = latLng;
                             mMap.clear();
                             markerByPlaceId.clear();
                             mMap.addMarker(new MarkerOptions().position(latLng).title(locationName));
                             animateCamera(latLng, 12f);
-                            searchForMarinas(latLng, currentRadiusMeters, currentTypeFilter);
+                            // Fetch with max radius; UI filters by currentRadiusMeters.
+                            searchForMarinas(latLng, maxSearchRadiusMeters, currentTypeFilter);
                         }
                     } else {
                         Toast.makeText(requireContext(), "No results for \"" + locationName + "\"", Toast.LENGTH_SHORT).show();
@@ -483,12 +481,13 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
     @Override
     public void onMapReady(@NonNull GoogleMap googleMap) {
         mMap = googleMap;
-        // Initial camera position (e.g., Miami).
+        // Initial camera position (Miami).
         LatLng miami = new LatLng(25.7617, -80.1918);
+        currentCenter = miami;
         mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(miami, 11f));
 
-        // Initial search with current filters.
-        searchForMarinas(miami, currentRadiusMeters, currentTypeFilter);
+        // Initial fetch with max radius; UI filters down to currentRadiusMeters.
+        searchForMarinas(miami, maxSearchRadiusMeters, currentTypeFilter);
 
         mMap.getUiSettings().setZoomControlsEnabled(true);
         mMap.getUiSettings().setMyLocationButtonEnabled(true);
@@ -496,9 +495,6 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
         enableMyLocation();
     }
 
-    /**
-     * Enables the My Location layer if the permission has been granted.
-     */
     private void enableMyLocation() {
         if (mMap == null || getContext() == null) return;
         if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.ACCESS_FINE_LOCATION)
@@ -511,9 +507,6 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
         }
     }
 
-    /**
-     * Moves the map camera to a specific location with animation.
-     */
     private void animateCamera(LatLng latLng, float zoom) {
         if (mMap == null) return;
         CameraPosition pos = new CameraPosition.Builder()
@@ -521,9 +514,6 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
         mMap.animateCamera(CameraUpdateFactory.newCameraPosition(pos));
     }
 
-    /**
-     * Returns the list of primary types to use in the Places API request based on the user selection.
-     */
     @NonNull
     private List<String> getPrimaryTypesForFilter(@NonNull String filterType) {
         String lower = filterType.toLowerCase(Locale.US);
@@ -534,10 +524,6 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
         return Arrays.asList("marina");
     }
 
-    /**
-     * Checks if a place matches the specific filter type (e.g., separating docks from marinas).
-     * Uses name and address string matching as a fallback since API types can be broad.
-     */
     private boolean matchesTypeFilter(@NonNull Place place, @NonNull String filterType) {
         String lowerFilter = filterType.toLowerCase(Locale.US);
         String name = place.getName() != null ? place.getName().toLowerCase(Locale.US) : "";
@@ -556,10 +542,15 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
     }
 
     /**
-     * Searches for marinas/docks/beaches near a given map location within a specified radius.
-     * Fetches results from Places API, filters them locally, and updates the UI.
+     * Fetches places within *maxSearchRadiusMeters* and stores them in allPlaces,
+     * then applies the currentRadiusMeters filter for display.
      */
-    private void searchForMarinas(@NonNull LatLng centerLatLng, double radiusInMeters, @NonNull String filterType) {
+    private void searchForMarinas(@NonNull LatLng centerLatLng,
+                                  double radiusInMetersIgnored,
+                                  @NonNull String filterType) {
+
+        double searchRadiusMeters = maxSearchRadiusMeters;
+
         List<Place.Field> placeFields = Arrays.asList(
                 Place.Field.ID,
                 Place.Field.NAME,
@@ -567,7 +558,7 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
                 Place.Field.ADDRESS
         );
 
-        CircularBounds locationRestriction = CircularBounds.newInstance(centerLatLng, radiusInMeters);
+        CircularBounds locationRestriction = CircularBounds.newInstance(centerLatLng, searchRadiusMeters);
         List<String> primaryTypes = getPrimaryTypesForFilter(filterType);
 
         SearchNearbyRequest request = SearchNearbyRequest.builder(locationRestriction, placeFields)
@@ -585,8 +576,12 @@ public class MapsFragment extends Fragment implements OnMapReadyCallback {
 
                 foundPlaces.add(place);
             }
+
             Log.d(TAG, "Found " + foundPlaces.size() + " places for filter=" + filterType);
-            setPlacesAndRefresh(foundPlaces);
+
+            // Store full set (within max radius) and then filter based on currentRadiusMeters.
+            allPlaces = new ArrayList<>(foundPlaces);
+            applyRadiusFilterAndRefresh();
 
         }).addOnFailureListener(e -> {
             Log.e(TAG, "Error searching for marinas", e);
