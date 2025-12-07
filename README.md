@@ -95,21 +95,42 @@ This project is built using a combination of modern Android libraries and Google
     
 ## 6. API Key Configuration
 
-To fetch live weather data, you must provide your own OpenWeatherMap API key.
+This project requires two separate API keys to function correctly: one for **Google Maps** (to display maps and search for places) and one for **OpenWeatherMap** (to fetch live weather data).
 
-1.  **Get an API Key:**
-    -   Sign up for a free account at [OpenWeatherMap.org](https://openweathermap.org/).
-    -   Navigate to the "API keys" section and copy your default key.
+### Step 1: Get Your API Keys
 
-2.  **Add the Key to Your Project:**
-    -   In the root directory of the Android Studio project, find or create a file named `local.properties`.
-    -   Add the following line to the `local.properties` file, replacing
-    `properties OPENWEATHER_API_KEY="YOUR_API_KEY"`
-    -   The `local.properties` file is included in `.gitignore` by default, so your key will not be committed to version control.
+#### A. Google Maps API Key
+
+1.  **Go to the Google Cloud Console:** Navigate to the [Google Cloud Console](https://console.cloud.google.com/).
+2.  **Create a New Project:** If you don't have one already, create a new project.
+3.  **Enable the necessary APIs:** For this project, you must enable the following APIs for your project. You can find them in the "APIs & Services" > "Library" section:
+    *   **Maps SDK for Android**
+    *   **Places API**
+4.  **Create API Credentials:**
+    *   Go to "APIs & Services" > "Credentials".
+    *   Click "Create Credentials" and select "API key".
+    *   Copy the generated API key.
+5.  **Restrict Your API Key (Important for Security):**
+    *   Find your new API key in the list and click the edit icon.
+    *   Under "Application restrictions," select "Android apps."
+    *   Click "Add an item" and enter your app's **package name** (`com.example.sailspots`) and your **SHA-1 certificate fingerprint**.
+    *   Under "API restrictions," select "Restrict key" and choose the **Maps SDK for Android** and **Places API** from the dropdown. This ensures your key only works for your app and only for the services it needs.
+
+#### B. OpenWeatherMap API Key
+
+1.  **Sign up for an account:** Go to [OpenWeatherMap.org](https://openweathermap.org/) and create a free account.
+2.  **Get an API Key:** Navigate to the "API keys" section on your account page and copy your default key.
+
+### Step 2: Add the Keys to Your Project
+
+To keep your keys secure and out of version control, you will add them to a `local.properties` file in the root directory of your project.
+
+1.  **Find or Create `local.properties`:** In the root folder of your Android Studio project (the same level as `gradle.properties` and `settings.gradle`), find or create a file named `local.properties`.
+
+2.  **Add Both Keys:** Paste the following lines into your `local.properties` file, replacing the placeholder text with the actual keys you copied.
 
 3.  **Sync Gradle:**
-    -   Android Studio will prompt you to sync your project. Click "Sync Now". The project is already configured to read this key from `local.properties` and make it available in the app through `BuildConfig.OPENWEATHER_API_KEY`.
-
+    -   Android Studio will prompt you to sync your project. Click "Sync Now".
 ---
 
 ## 7. Build and Dependency Information
